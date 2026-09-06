@@ -1,10 +1,34 @@
 "use client";
 
 import { useState, useRef, ChangeEvent, DragEvent } from "react";
+import { generateExamPdf } from "@/lib/generateExamPdf";
+import { LayoutSettings, QuestionLayout } from "@/types/layout";
 import { Question } from "@/types/question";
 import { decodeCsvFile, parseQuestionsCsv } from "@/utils/csvParser";
 
 type PreviewMode = "question" | "answer";
+
+const createLayoutSettings = (parsedQuestions: Question[]): LayoutSettings => ({
+    choice: {
+        count: parsedQuestions.filter((question) => question.type === "4択")
+            .length,
+        columns: 5,
+        rows: 2,
+    },
+    word: {
+        count: parsedQuestions.filter((question) => question.type === "単語")
+            .length,
+        columns: 5,
+        rows: 7,
+    },
+    essay: {
+        count: parsedQuestions.filter(
+            (question) => question.type === "自由記述",
+        ).length,
+        columns: 1,
+        rows: 5,
+    },
+});
 
 export default function Home() {
     const [questions, setQuestions] = useState<Question[]>([]);
@@ -13,8 +37,140 @@ export default function Home() {
     const [isLoading, setIsLoading] = useState<boolean>(false);
     const [isDragging, setIsDragging] = useState<boolean>(false);
     const [previewMode, setPreviewMode] = useState<PreviewMode>("question");
+    const [isSettingsModalOpen, setIsSettingsModalOpen] =
+        useState<boolean>(false);
+    const [settings, setSettings] = useState<LayoutSettings | null>(null);
+    const [appliedSettings, setAppliedSettings] =
+        useState<LayoutSettings | null>(null);
+    const [settingsError, setSettingsError] = useState<string | null>(null);
+    const [isGeneratingPdf, setIsGeneratingPdf] = useState<boolean>(false);
 
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const allChoiceQuestions = questions.filter(
+        (question) => question.type === "4択",
+    );
+    const allWordQuestions = questions.filter(
+        (question) => question.type === "単語",
+    );
+    const allEssayQuestions = questions.filter(
+        (question) => question.type === "自由記述",
+    );
+    const choiceQuestions = allChoiceQuestions.slice(
+        0,
+        appliedSettings?.choice.count,
+    );
+    const wordQuestions = allWordQuestions.slice(
+        0,
+        appliedSettings?.word.count,
+    );
+    const essayQuestions = allEssayQuestions.slice(
+        0,
+        appliedSettings?.essay.count,
+    );
+    const previewQuestions = [
+        ...choiceQuestions,
+        ...wordQuestions,
+        ...essayQuestions,
+    ]
+        .sort((first, second) => first.id - second.id)
+        .map((question, index) => ({
+            question,
+            displayNumber: index + 1,
+        }));
+    const displayNumbers = new Map(
+        previewQuestions.map(({ question, displayNumber }) => [
+            question.id,
+            displayNumber,
+        ]),
+    );
+
+    const updateLayoutSetting = (
+        type: keyof LayoutSettings,
+        field: keyof QuestionLayout,
+        value: number,
+    ) => {
+        setSettings((current) =>
+            {
+                if (!current) return current;
+
+                const availableCounts = {
+                    choice: allChoiceQuestions.length,
+                    word: allWordQuestions.length,
+                    essay: allEssayQuestions.length,
+                };
+                const nextValue = Math.max(1, value || 1);
+                const limitedValue =
+                    field === "count"
+                        ? Math.min(nextValue, availableCounts[type])
+                        : nextValue;
+
+                return {
+                    ...current,
+                    [type]: {
+                        ...current[type],
+                        [field]: limitedValue,
+                    },
+                };
+            },
+        );
+    };
+
+    const handlePreview = () => {
+        if (!settings) return;
+
+        const availableCounts = {
+            choice: allChoiceQuestions.length,
+            word: allWordQuestions.length,
+            essay: allEssayQuestions.length,
+        };
+
+        for (const type of ["choice", "word", "essay"] as const) {
+            const layout = settings[type];
+            if (layout.count > availableCounts[type]) {
+                setSettingsError(
+                    `${type === "choice" ? "選択問題" : type === "word" ? "単語回答" : "自由記述"}の表示件数は、CSV内の${availableCounts[type]}問以下にしてください。`,
+                );
+                return;
+            }
+            if (layout.columns * layout.rows < layout.count) {
+                setSettingsError(
+                    `${type === "choice" ? "選択問題" : type === "word" ? "単語回答" : "自由記述"}は、横×縦が表示件数以上になるように指定してください。`,
+                );
+                return;
+            }
+        }
+
+        setAppliedSettings(settings);
+        setSettingsError(null);
+        setIsSettingsModalOpen(false);
+    };
+
+    const handlePdfDownload = async () => {
+        if (!appliedSettings || isGeneratingPdf) return;
+
+        setIsGeneratingPdf(true);
+        setErrors([]);
+
+        try {
+            await generateExamPdf({
+                fileName,
+                previewQuestions,
+                choiceQuestions,
+                wordQuestions,
+                essayQuestions,
+                displayNumbers,
+                layout: appliedSettings,
+            });
+        } catch (error) {
+            setErrors([
+                `PDFの生成中にエラーが発生しました: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            ]);
+        } finally {
+            setIsGeneratingPdf(false);
+        }
+    };
 
     // ファイル処理ロジック
     const processFile = async (file: File) => {
@@ -42,6 +198,10 @@ export default function Home() {
             }
 
             setQuestions(parsedQuestions);
+            setSettings(createLayoutSettings(parsedQuestions));
+            setAppliedSettings(null);
+            setSettingsError(null);
+            setIsSettingsModalOpen(parsedQuestions.length > 0);
         } catch (err) {
             setErrors([
                 `ファイルの読み込み中にエラーが発生しました: ${
@@ -87,6 +247,10 @@ export default function Home() {
         setQuestions([]);
         setFileName(null);
         setErrors([]);
+        setSettings(null);
+        setAppliedSettings(null);
+        setSettingsError(null);
+        setIsSettingsModalOpen(false);
         if (fileInputRef.current) {
             fileInputRef.current.value = "";
         }
@@ -219,15 +383,38 @@ export default function Home() {
             )}
 
             {/* プレビュー表示エリア */}
-            {questions.length > 0 && (
+            {questions.length > 0 && appliedSettings && (
                 <section className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
                     <div className="px-6 py-4 border-b border-gray-200 flex flex-wrap items-center justify-between gap-3">
                         <h2 className="text-lg font-semibold text-gray-800">
-                            2. プレビュー（読み込み件数: {questions.length}件）
+                            2. プレビュー（表示件数: {choiceQuestions.length + wordQuestions.length + essayQuestions.length}件）
                         </h2>
-                        <span className="text-xs bg-green-100 text-green-800 font-medium px-2.5 py-0.5 rounded">
-                            解析成功
-                        </span>
+                        <div className="flex items-center gap-3">
+                            <span className="text-xs bg-green-100 text-green-800 font-medium px-2.5 py-0.5 rounded">
+                                解析成功
+                            </span>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setSettings(appliedSettings);
+                                    setSettingsError(null);
+                                    setIsSettingsModalOpen(true);
+                                }}
+                                className="rounded-md border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100"
+                            >
+                                レイアウト設定
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handlePdfDownload}
+                                disabled={isGeneratingPdf}
+                                className="rounded-md bg-gray-800 px-3 py-1.5 text-xs font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:bg-gray-400"
+                            >
+                                {isGeneratingPdf
+                                    ? "PDFを生成中..."
+                                    : "PDFをダウンロード"}
+                            </button>
+                        </div>
                     </div>
 
                     <div
@@ -267,7 +454,8 @@ export default function Home() {
 
                     {previewMode === "question" ? (
                         <div className="p-6 space-y-6" role="tabpanel">
-                            {questions.map((question) => (
+                            {previewQuestions.map(
+                                ({ question, displayNumber }) => (
                                 <article
                                     key={question.id}
                                     className="border-b border-gray-200 pb-6 last:border-b-0 last:pb-0"
@@ -286,7 +474,7 @@ export default function Home() {
                                         </span>
                                         <div className="flex-1">
                                             <h3 className="text-base font-semibold leading-7 text-gray-900">
-                                                問{question.id}.{" "}
+                                                問{displayNumber}.{" "}
                                                 {question.questionText}
                                             </h3>
 
@@ -343,7 +531,8 @@ export default function Home() {
                                         </div>
                                     </div>
                                 </article>
-                            ))}
+                                ),
+                            )}
                         </div>
                     ) : (
                         <div className="p-6" role="tabpanel">
@@ -362,100 +551,196 @@ export default function Home() {
                                     問題形式に従って、それぞれの解答欄に記入してください。
                                 </p>
                             </div>
-                            <div className="overflow-x-auto">
-                                <table className="w-full min-w-[560px] border-collapse border border-gray-300 text-sm">
-                                    <thead className="bg-gray-100 text-gray-700">
-                                        <tr>
-                                            <th className="border border-gray-300 px-3 py-3 w-20 text-center">
-                                                問題番号
-                                            </th>
-                                            <th className="border border-gray-300 px-3 py-3 w-24 text-center">
-                                                形式
-                                            </th>
-                                            <th className="border border-gray-300 px-4 py-3 text-center">
-                                                解答欄
-                                            </th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-gray-300">
-                                        {questions.map((question) => (
-                                            <tr key={question.id}>
-                                                <th className="border border-gray-300 bg-gray-50 px-3 py-4 font-semibold text-gray-800 text-center align-middle">
-                                                    {question.id}
-                                                </th>
-                                                <td className="border border-gray-300 bg-gray-50/50 px-3 py-4 text-center align-middle">
-                                                    <span
-                                                        className={`text-xs px-2 py-0.5 rounded font-medium ${
-                                                            question.type ===
-                                                            "4択"
-                                                                ? "bg-blue-100 text-blue-800"
-                                                                : question.type ===
-                                                                    "単語"
-                                                                  ? "bg-emerald-100 text-emerald-800"
-                                                                  : "bg-purple-100 text-purple-800"
-                                                        }`}
-                                                    >
-                                                        {question.type}
+                            <div className="space-y-8">
+                                {choiceQuestions.length > 0 && (
+                                    <section>
+                                        <h4 className="mb-3 text-sm font-semibold text-gray-800">
+                                            選択問題
+                                        </h4>
+                                        <div
+                                            className="grid gap-3"
+                                            style={{
+                                                gridTemplateColumns: `repeat(${appliedSettings.choice.columns}, minmax(0, 1fr))`,
+                                            }}
+                                        >
+                                            {choiceQuestions.map((question) => (
+                                                <article
+                                                    key={question.id}
+                                                    className="break-inside-avoid border border-gray-300 bg-white p-3"
+                                                >
+                                                    <h5 className="text-sm font-semibold text-gray-900">
+                                                        問{displayNumbers.get(question.id)}
+                                                    </h5>
+                                                    <div className="mt-2 h-12 border-2 border-gray-500" />
+                                                </article>
+                                            ))}
+                                        </div>
+                                    </section>
+                                )}
+
+                                {wordQuestions.length > 0 && (
+                                    <section>
+                                        <h4 className="mb-3 text-sm font-semibold text-gray-800">
+                                            単語回答
+                                        </h4>
+                                        <div
+                                            className="grid gap-x-4 gap-y-3"
+                                            style={{
+                                                gridTemplateColumns: `repeat(${appliedSettings.word.columns}, minmax(0, 1fr))`,
+                                            }}
+                                        >
+                                            {wordQuestions.map((question) => (
+                                                <article
+                                                    key={question.id}
+                                                    className="break-inside-avoid flex items-center gap-2 border-b-2 border-gray-400 pb-2"
+                                                >
+                                                    <h5 className="shrink-0 text-sm font-semibold text-gray-900">
+                                                        問{displayNumbers.get(question.id)}
+                                                    </h5>
+                                                    <div className="h-6 flex-1" />
+                                                </article>
+                                            ))}
+                                        </div>
+                                    </section>
+                                )}
+
+                                {essayQuestions.length > 0 && (
+                                    <section>
+                                        <h4 className="mb-3 text-sm font-semibold text-gray-800">
+                                            自由記述
+                                        </h4>
+                                        <div
+                                            className="grid gap-6"
+                                            style={{
+                                                gridTemplateColumns: `repeat(${appliedSettings.essay.columns}, minmax(0, 1fr))`,
+                                            }}
+                                        >
+                                            {essayQuestions.map((question) => (
+                                                <article
+                                                    key={question.id}
+                                                    className="break-inside-avoid border-b border-gray-200 pb-6 last:border-b-0 last:pb-0"
+                                                >
+                                                    <h5 className="text-base font-semibold leading-7 text-gray-900">
+                                                        問{displayNumbers.get(question.id)}
+                                                    </h5>
+                                                    <div className="mt-4 min-h-[130px] p-3 border border-dashed border-gray-300 rounded bg-gray-50/30 flex flex-col justify-end text-xs text-gray-400">
+                                                {question.maxChars && (
+                                                    <span className="text-right text-gray-500 font-medium">
+                                                        最大 {question.maxChars} 文字
                                                     </span>
-                                                </td>
-                                                <td className="border border-gray-300 px-4 py-3 align-middle bg-white">
-                                                    {/* 4択解答欄 */}
-                                                    {question.type ===
-                                                        "4択" && (
-                                                        <div className="flex items-center justify-center gap-4 py-1">
-                                                            {[1, 2, 3, 4].map(
-                                                                (number) => (
-                                                                    <span
-                                                                        key={
-                                                                            number
-                                                                        }
-                                                                        className="inline-flex h-8 w-8 items-center justify-center rounded-full border-2 border-gray-500 font-medium text-gray-700 bg-white"
-                                                                        aria-label={`問題${question.id}の選択肢${number}`}
-                                                                    >
-                                                                        {number}
-                                                                    </span>
-                                                                ),
-                                                            )}
-                                                        </div>
-                                                    )}
-
-                                                    {/* 単語解答欄 */}
-                                                    {question.type ===
-                                                        "単語" && (
-                                                        <div className="py-2 px-3 border-b-2 border-gray-400 text-xs text-gray-400 bg-gray-50/40 rounded-t min-h-[38px] flex items-center">
-                                                            <span>
-                                                                （解答を記入）
-                                                            </span>
-                                                        </div>
-                                                    )}
-
-                                                    {/* 自由記述解答欄 */}
-                                                    {question.type ===
-                                                        "自由記述" && (
-                                                        <div className="min-h-[88px] p-3 border border-dashed border-gray-300 rounded bg-gray-50/30 flex flex-col justify-between text-xs text-gray-400">
-                                                            <span>
-                                                                （記述欄）
-                                                            </span>
-                                                            {question.maxChars && (
-                                                                <span className="text-right text-gray-500 font-medium">
-                                                                    最大{" "}
-                                                                    {
-                                                                        question.maxChars
-                                                                    }{" "}
-                                                                    文字
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                    )}
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
+                                                )}
+                                            </div>
+                                                </article>
+                                            ))}
+                                        </div>
+                                    </section>
+                                )}
                             </div>
                         </div>
                     )}
                 </section>
+            )}
+
+            {isSettingsModalOpen && settings && (
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/50 p-4"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="layout-settings-title"
+                >
+                    <div className="w-full max-w-2xl rounded-lg bg-white shadow-xl">
+                        <div className="border-b border-gray-200 px-6 py-4">
+                            <h2
+                                id="layout-settings-title"
+                                className="text-lg font-semibold text-gray-900"
+                            >
+                                レイアウト設定
+                            </h2>
+                            <p className="mt-1 text-sm text-gray-600">
+                                表示する問題数と、解答用紙での横・縦の配置を指定してください。
+                            </p>
+                        </div>
+
+                        <div className="space-y-5 px-6 py-5">
+                            {[
+                                ["choice", "選択問題", allChoiceQuestions.length],
+                                ["word", "単語回答", allWordQuestions.length],
+                                ["essay", "自由記述", allEssayQuestions.length],
+                            ].map(([type, label, available]) => {
+                                const key = type as keyof LayoutSettings;
+                                const layout = settings[key];
+
+                                return (
+                                    <section key={key} className="border-b border-gray-200 pb-5 last:border-b-0 last:pb-0">
+                                        <div className="mb-3 flex items-center justify-between">
+                                            <h3 className="text-sm font-semibold text-gray-800">
+                                                {label}
+                                            </h3>
+                                            <span className="text-xs text-gray-500">
+                                                CSV内: {available}問
+                                            </span>
+                                        </div>
+                                        <div className="grid grid-cols-3 gap-3">
+                                            {[
+                                                ["count", "表示件数"],
+                                                ["columns", "横"],
+                                                ["rows", "縦"],
+                                            ].map(([field, fieldLabel]) => (
+                                                <label key={field} className="text-xs font-medium text-gray-700">
+                                                    {fieldLabel}
+                                                    <input
+                                                        type="number"
+                                                        min="1"
+                                                        max={
+                                                            field === "count"
+                                                                ? available
+                                                                : undefined
+                                                        }
+                                                        value={layout[field as keyof QuestionLayout]}
+                                                        onChange={(event) =>
+                                                            updateLayoutSetting(
+                                                                key,
+                                                                field as keyof QuestionLayout,
+                                                                Number(event.target.value),
+                                                            )
+                                                        }
+                                                        className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                                                    />
+                                                </label>
+                                            ))}
+                                        </div>
+                                    </section>
+                                );
+                            })}
+
+                            {settingsError && (
+                                <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                                    {settingsError}
+                                </p>
+                            )}
+                        </div>
+
+                        <div className="flex justify-end gap-3 border-t border-gray-200 px-6 py-4">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setIsSettingsModalOpen(false);
+                                    setSettingsError(null);
+                                }}
+                                className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                            >
+                                キャンセル
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handlePreview}
+                                className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                            >
+                                プレビューを表示
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
         </main>
     );
