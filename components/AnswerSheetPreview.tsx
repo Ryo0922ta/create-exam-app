@@ -55,7 +55,7 @@ export function AnswerSheetPreview({
                             単語回答
                         </h4>
                         <div
-                            className="grid gap-x-4 gap-y-3"
+                            className="grid gap-x-[18px] gap-y-3"
                             style={{
                                 gridTemplateColumns: `repeat(${layout.word.columns}, minmax(0, 1fr))`,
                             }}

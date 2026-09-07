@@ -144,3 +144,55 @@ export function parseQuestionsCsv(csvText: string): ParseCsvResult {
 
     return { questions, errors };
 }
+
+/**
+ * Question 配列を CSV 文字列に変換し、ブラウザ上でダウンロードさせる
+ */
+export function exportQuestionsToCsv(
+    questions: Question[],
+    originalFileName?: string | null,
+): void {
+    const rows = questions.map((q) => {
+        const isChoice = q.type === "4択";
+        const isEssay = q.type === "自由記述";
+
+        return {
+            問題番号: q.id,
+            問題形式: q.type,
+            問題文: q.questionText,
+            選択肢1: isChoice ? q.option1 : "",
+            選択肢2: isChoice ? q.option2 : "",
+            選択肢3: isChoice ? q.option3 : "",
+            選択肢4: isChoice ? q.option4 : "",
+            文字数制限: isEssay ? (q.maxChars ?? "") : "",
+        };
+    });
+
+    const csvContent = Papa.unparse(rows, {
+        header: true,
+    });
+
+    // 日本語のExcel・エディタでの文字化け防止のため BOM を付加
+    const bom = "\uFEFF";
+    const blob = new Blob([bom + csvContent], {
+        type: "text/csv;charset=utf-8;",
+    });
+
+    let downloadName = "questions_edited.csv";
+    if (originalFileName) {
+        if (/\.csv$/i.test(originalFileName)) {
+            downloadName = originalFileName.replace(/\.csv$/i, "_edited.csv");
+        } else {
+            downloadName = `${originalFileName}_edited.csv`;
+        }
+    }
+
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", downloadName);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+}

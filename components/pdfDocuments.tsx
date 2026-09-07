@@ -91,6 +91,12 @@ const styles = StyleSheet.create({
     gridItem: {
         padding: 3,
     },
+    wordGridItem: {
+        paddingTop: 3,
+        paddingBottom: 3,
+        paddingLeft: 4,
+        paddingRight: 4,
+    },
     choiceAnswer: {
         minHeight: 55,
         borderWidth: 1,
@@ -204,10 +210,14 @@ export function QuestionSheetDocument({
 function AnswerGrid({
     questions,
     columns,
+    itemStyle,
     children,
 }: {
     questions: Question[];
     columns: number;
+    itemStyle?:
+        | StyleSheet.NamedStyles<object>[string]
+        | StyleSheet.NamedStyles<object>[string][];
     children: (question: Question) => React.ReactNode;
 }) {
     return (
@@ -215,7 +225,11 @@ function AnswerGrid({
             {questions.map((question) => (
                 <View
                     key={question.id}
-                    style={[styles.gridItem, { width: `${100 / columns}%` }]}
+                    style={[
+                        styles.gridItem,
+                        itemStyle,
+                        { width: `${100 / columns}%` },
+                    ]}
                     wrap={false}
                 >
                     {children(question)}
@@ -269,6 +283,7 @@ export function AnswerSheetDocument({
                         <AnswerGrid
                             questions={wordQuestions}
                             columns={layout.word.columns}
+                            itemStyle={styles.wordGridItem}
                         >
                             {(question) => (
                                 <View style={styles.wordAnswer}>

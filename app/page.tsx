@@ -13,12 +13,18 @@ import {
 import { generateExamPdf } from "@/lib/generateExamPdf";
 import { LayoutSettings, QuestionLayout } from "@/types/layout";
 import { Question } from "@/types/question";
-import { decodeCsvFile, parseQuestionsCsv } from "@/utils/csvParser";
+import {
+    decodeCsvFile,
+    exportQuestionsToCsv,
+    parseQuestionsCsv,
+} from "@/utils/csvParser";
 
 type PreviewMode = "question" | "answer";
 
 export default function Home() {
     const [questions, setQuestions] = useState<Question[]>([]);
+    const [originalQuestions, setOriginalQuestions] = useState<Question[]>([]);
+    const [syncedQuestions, setSyncedQuestions] = useState<Question[]>([]);
     const [fileName, setFileName] = useState<string | null>(null);
     const [csvErrors, setCsvErrors] = useState<string[]>([]);
     const [pdfError, setPdfError] = useState<string | null>(null);
@@ -35,37 +41,47 @@ export default function Home() {
 
     const fileInputRef = useRef<HTMLInputElement>(null);
     const allQuestions = groupQuestions(questions);
-    const examPreview = createExamPreview(questions, appliedSettings);
+    const questionExamPreview = createExamPreview(questions, appliedSettings);
+    const answerExamPreview = createExamPreview(
+        syncedQuestions,
+        appliedSettings,
+    );
+
+    const isEdited =
+        originalQuestions.length > 0 &&
+        JSON.stringify(questions) !== JSON.stringify(originalQuestions);
+
+    const hasUnsyncedChanges =
+        questions.length > 0 &&
+        JSON.stringify(questions) !== JSON.stringify(syncedQuestions);
 
     const updateLayoutSetting = (
         type: keyof LayoutSettings,
         field: keyof QuestionLayout,
         value: number,
     ) => {
-        setSettings((current) =>
-            {
-                if (!current) return current;
+        setSettings((current) => {
+            if (!current) return current;
 
-                const availableCounts = {
-                    choice: allQuestions.choiceQuestions.length,
-                    word: allQuestions.wordQuestions.length,
-                    essay: allQuestions.essayQuestions.length,
-                };
-                const nextValue = Math.max(1, value || 1);
-                const limitedValue =
-                    field === "count"
-                        ? Math.min(nextValue, availableCounts[type])
-                        : nextValue;
+            const availableCounts = {
+                choice: allQuestions.choiceQuestions.length,
+                word: allQuestions.wordQuestions.length,
+                essay: allQuestions.essayQuestions.length,
+            };
+            const nextValue = Math.max(1, value || 1);
+            const limitedValue =
+                field === "count"
+                    ? Math.min(nextValue, availableCounts[type])
+                    : nextValue;
 
-                return {
-                    ...current,
-                    [type]: {
-                        ...current[type],
-                        [field]: limitedValue,
-                    },
-                };
-            },
-        );
+            return {
+                ...current,
+                [type]: {
+                    ...current[type],
+                    [field]: limitedValue,
+                },
+            };
+        });
     };
 
     const handlePreview = () => {
@@ -91,7 +107,11 @@ export default function Home() {
         try {
             await generateExamPdf({
                 fileName,
-                ...examPreview,
+                previewQuestions: questionExamPreview.previewQuestions,
+                choiceQuestions: answerExamPreview.choiceQuestions,
+                wordQuestions: answerExamPreview.wordQuestions,
+                essayQuestions: answerExamPreview.essayQuestions,
+                displayNumbers: answerExamPreview.displayNumbers,
                 layout: appliedSettings,
             });
         } catch (error) {
@@ -132,6 +152,8 @@ export default function Home() {
             }
 
             setQuestions(parsedQuestions);
+            setOriginalQuestions(parsedQuestions);
+            setSyncedQuestions(parsedQuestions);
             setSettings(createLayoutSettings(parsedQuestions));
             setAppliedSettings(null);
             setSettingsError(null);
@@ -143,6 +165,8 @@ export default function Home() {
                 }`,
             ]);
             setQuestions([]);
+            setOriginalQuestions([]);
+            setSyncedQuestions([]);
         } finally {
             setIsLoading(false);
         }
@@ -176,9 +200,11 @@ export default function Home() {
         }
     };
 
-    // リセット処理
+    // アップロード全体のリセット処理
     const handleReset = () => {
         setQuestions([]);
+        setOriginalQuestions([]);
+        setSyncedQuestions([]);
         setFileName(null);
         setCsvErrors([]);
         setPdfError(null);
@@ -189,6 +215,43 @@ export default function Home() {
         if (fileInputRef.current) {
             fileInputRef.current.value = "";
         }
+    };
+
+    // プレビュー編集の更新処理
+    const handleUpdateQuestion = (
+        id: number,
+        updatedFields: Partial<Question>,
+    ) => {
+        setQuestions((current) =>
+            current.map((q) => {
+                if (q.id === id) {
+                    return { ...q, ...updatedFields } as Question;
+                }
+                return q;
+            }),
+        );
+    };
+
+    // 編集内容をアップロード時の状態に戻す
+    const handleResetQuestions = () => {
+        if (
+            window.confirm(
+                "プレビューの編集内容を破棄し、アップロード時の状態に戻しますか？",
+            )
+        ) {
+            setQuestions(originalQuestions);
+            setSyncedQuestions(originalQuestions);
+        }
+    };
+
+    // 解答用紙への手動同期
+    const handleSyncToAnswerSheet = () => {
+        setSyncedQuestions(questions);
+    };
+
+    // 編集後CSVのエクスポート
+    const handleExportCsv = () => {
+        exportQuestionsToCsv(questions, fileName);
     };
 
     return (
@@ -247,9 +310,49 @@ export default function Home() {
                     </ul>
                 </section>
             )}
-            {pdfError && <p className="mb-8 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">{pdfError}</p>}
-            {questions.length > 0 && appliedSettings && <PreviewPanel {...examPreview} layout={appliedSettings} previewMode={previewMode} isGeneratingPdf={isGeneratingPdf} onPreviewModeChange={setPreviewMode} onOpenSettings={() => { setSettings(appliedSettings); setSettingsError(null); setIsSettingsModalOpen(true); }} onDownloadPdf={handlePdfDownload} />}
-            {isSettingsModalOpen && settings && <LayoutSettingsModal settings={settings} availableQuestions={allQuestions} error={settingsError} onUpdate={updateLayoutSetting} onCancel={() => { setIsSettingsModalOpen(false); setSettingsError(null); }} onPreview={handlePreview} />}
+            {pdfError && (
+                <p className="mb-8 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+                    {pdfError}
+                </p>
+            )}
+            {questions.length > 0 && appliedSettings && (
+                <PreviewPanel
+                    previewQuestions={questionExamPreview.previewQuestions}
+                    choiceQuestions={answerExamPreview.choiceQuestions}
+                    wordQuestions={answerExamPreview.wordQuestions}
+                    essayQuestions={answerExamPreview.essayQuestions}
+                    displayNumbers={answerExamPreview.displayNumbers}
+                    layout={appliedSettings}
+                    previewMode={previewMode}
+                    isGeneratingPdf={isGeneratingPdf}
+                    isEdited={isEdited}
+                    hasUnsyncedChanges={hasUnsyncedChanges}
+                    onPreviewModeChange={setPreviewMode}
+                    onOpenSettings={() => {
+                        setSettings(appliedSettings);
+                        setSettingsError(null);
+                        setIsSettingsModalOpen(true);
+                    }}
+                    onDownloadPdf={handlePdfDownload}
+                    onResetQuestions={handleResetQuestions}
+                    onExportCsv={handleExportCsv}
+                    onSyncAnswerSheet={handleSyncToAnswerSheet}
+                    onUpdateQuestion={handleUpdateQuestion}
+                />
+            )}
+            {isSettingsModalOpen && settings && (
+                <LayoutSettingsModal
+                    settings={settings}
+                    availableQuestions={allQuestions}
+                    error={settingsError}
+                    onUpdate={updateLayoutSetting}
+                    onCancel={() => {
+                        setIsSettingsModalOpen(false);
+                        setSettingsError(null);
+                    }}
+                    onPreview={handlePreview}
+                />
+            )}
         </main>
     );
 }
