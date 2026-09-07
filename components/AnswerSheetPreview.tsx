@@ -38,7 +38,7 @@ export function AnswerSheetPreview({
                             {choiceQuestions.map((question) => (
                                 <article
                                     key={question.id}
-                                    className="break-inside-avoid border border-gray-300 bg-white p-3"
+                                    className="break-inside-avoid p-1"
                                 >
                                     <h5 className="text-sm font-semibold text-gray-900">
                                         問{displayNumbers.get(question.id)}

@@ -99,9 +99,7 @@ const styles = StyleSheet.create({
     },
     choiceAnswer: {
         minHeight: 55,
-        borderWidth: 1,
-        borderColor: "#000000",
-        padding: 7,
+        padding: 4,
     },
     choiceBox: {
         height: 30,
