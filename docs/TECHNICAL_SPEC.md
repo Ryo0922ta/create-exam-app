@@ -8,10 +8,17 @@ Next.js App Router、React、TypeScript、Tailwind CSSで構築したクライ�
 
 | ファイル                              | 責務                                                                 |
 | ------------------------------------- | -------------------------------------------------------------------- |
-| `app/page.tsx`                        | CSVアップロード、状態管理、レイアウト設定、プレビュー、PDF生成の起点 |
+| `app/page.tsx`                        | 画面状態とイベントを各コンポーネント・ユーティリティへ接続          |
+| `components/CsvUploader.tsx`          | CSVファイル選択、ドラッグ&ドロップ、ファイル名、リセット操作        |
+| `components/LayoutSettingsModal.tsx`  | レイアウト設定の入力と検証エラー表示                                |
+| `components/PreviewPanel.tsx`         | タブ切替、プレビュー操作、問題・解答用紙プレビューの切替            |
+| `components/QuestionPaperPreview.tsx` | 問題用紙プレビューの描画                                            |
+| `components/AnswerSheetPreview.tsx`   | 解答用紙プレビューの描画                                            |
 | `types/question.ts`                   | CSV行、問題形式、問題データの型定義                                  |
 | `types/layout.ts`                     | 問題形式ごとの表示件数・横・縦のレイアウト型                         |
+| `types/exam.ts`                       | 問題グループと表示番号を含む試験プレビューの共有型                   |
 | `utils/csvParser.ts`                  | 文字コードの判定、CSV解析、問題データへの変換                        |
+| `lib/examLayout.ts`                   | 問題の形式別抽出、表示番号作成、レイアウト初期化・検証               |
 | `components/pdfDocuments.tsx`         | React PDF形式の問題用紙・解答用紙の描画                              |
 | `lib/generateExamPdf.ts`              | PDF生成、結合、ダウンロード                                          |
 | `public/fonts/NotoSansJP-Regular.otf` | PDFへ埋め込む日本語フォント                                          |
@@ -37,6 +44,11 @@ type LayoutSettings = {
     word: QuestionLayout;
     essay: QuestionLayout;
 };
+
+type NumberedQuestion = {
+    question: Question;
+    displayNumber: number;
+};
 ```
 
 `ChoiceQuestion` は4つの選択肢を持ち、`EssayQuestion` は任意の `maxChars` を持ちます。`WordQuestion` に形式固有の追加属性はありません。
@@ -58,7 +70,7 @@ type LayoutSettings = {
 
 ## 5. 画面状態とプレビュー
 
-`app/page.tsx` はCSVから得た全問題を形式ごとに分け、`appliedSettings` の表示件数で切り出します。切り出した全問題をCSVの `id` 昇順に並べ、`previewQuestions` で `displayNumber` を1から採番します。
+`app/page.tsx` はCSV、レイアウト、タブ、PDF生成の状態を保持し、具体的なUIは各コンポーネントへ委譲します。`lib/examLayout.ts` はCSVから得た全問題を形式ごとに分け、`appliedSettings` の表示件数で切り出します。切り出した全問題をCSVの `id` 昇順に並べ、`previewQuestions` で `displayNumber` を1から採番します。
 
 `displayNumbers` は問題IDと表示番号の対応表です。問題用紙、解答用紙、PDFはこの対応表を共有するため、用紙間で連番が一致します。
 
@@ -68,6 +80,8 @@ type LayoutSettings = {
 count <= CSV内の該当問題数
 columns x rows >= count
 ```
+
+エラー状態はCSV解析の `csvErrors`、PDF生成の `pdfError`、設定検証の `settingsError` に分けて保持します。これにより、PDF生成を試してもCSVの解析エラーは消去されません。
 
 ## 6. PDF生成
 

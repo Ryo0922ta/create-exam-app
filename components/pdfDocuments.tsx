@@ -6,6 +6,7 @@ import {
     Text,
     View,
 } from "@react-pdf/renderer";
+import { NumberedQuestion } from "@/types/exam";
 import { LayoutSettings } from "@/types/layout";
 import { Question } from "@/types/question";
 
@@ -13,11 +14,6 @@ Font.register({
     family: "NotoSansJP",
     src: "/fonts/NotoSansJP-Regular.otf",
 });
-
-type NumberedQuestion = {
-    question: Question;
-    displayNumber: number;
-};
 
 type QuestionSheetDocumentProps = {
     questions: NumberedQuestion[];
