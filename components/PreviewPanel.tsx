@@ -1,5 +1,7 @@
+import { useState } from "react";
 import { AnswerSheetPreview } from "@/components/AnswerSheetPreview";
 import { QuestionPaperPreview } from "@/components/QuestionPaperPreview";
+import { PdfDownloadTarget } from "@/lib/generateExamPdf";
 import { ExamPreview } from "@/types/exam";
 import { LayoutSettings } from "@/types/layout";
 import { Question } from "@/types/question";
@@ -14,7 +16,7 @@ type PreviewPanelProps = ExamPreview & {
     hasUnsyncedChanges?: boolean;
     onPreviewModeChange: (mode: PreviewMode) => void;
     onOpenSettings: () => void;
-    onDownloadPdf: () => void;
+    onDownloadPdf: (target: PdfDownloadTarget) => void;
     onResetQuestions?: () => void;
     onExportCsv?: () => void;
     onSyncAnswerSheet?: () => void;
@@ -40,6 +42,8 @@ export function PreviewPanel({
     onSyncAnswerSheet,
     onUpdateQuestion,
 }: PreviewPanelProps) {
+    const [pdfTarget, setPdfTarget] = useState<PdfDownloadTarget>("all");
+
     return (
         <section className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 px-6 py-4">
@@ -120,16 +124,33 @@ export function PreviewPanel({
                     >
                         レイアウト設定
                     </button>
-                    <button
-                        type="button"
-                        onClick={onDownloadPdf}
-                        disabled={isGeneratingPdf}
-                        className="rounded-md bg-gray-800 px-3 py-1.5 text-xs font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:bg-gray-400"
-                    >
-                        {isGeneratingPdf
-                            ? "PDFを生成中..."
-                            : "PDFをダウンロード"}
-                    </button>
+                    <div className="flex items-center rounded-md bg-gray-800 p-0.5 shadow-sm">
+                        <select
+                            value={pdfTarget}
+                            onChange={(e) =>
+                                setPdfTarget(
+                                    e.target.value as PdfDownloadTarget,
+                                )
+                            }
+                            disabled={isGeneratingPdf}
+                            aria-label="PDFダウンロード対象"
+                            className="rounded-l-md border-r border-gray-700 bg-gray-800 py-1.5 pl-2.5 pr-2 text-xs font-medium text-gray-200 outline-none hover:text-white focus:ring-1 focus:ring-blue-400 disabled:cursor-not-allowed disabled:bg-gray-700 disabled:text-gray-400"
+                        >
+                            <option value="all">全部（問題・解答用紙）</option>
+                            <option value="question">問題用紙のみ</option>
+                            <option value="answer">解答用紙のみ</option>
+                        </select>
+                        <button
+                            type="button"
+                            onClick={() => onDownloadPdf(pdfTarget)}
+                            disabled={isGeneratingPdf}
+                            className="rounded-r-md bg-gray-800 px-3 py-1.5 text-xs font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:bg-gray-700 disabled:text-gray-400"
+                        >
+                            {isGeneratingPdf
+                                ? "PDFを生成中..."
+                                : "PDFをダウンロード"}
+                        </button>
+                    </div>
                 </div>
             </div>
             <div

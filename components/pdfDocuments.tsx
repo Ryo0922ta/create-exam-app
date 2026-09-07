@@ -205,6 +205,8 @@ export function QuestionSheetDocument({
     );
 }
 
+type PdfStyle = Parameters<typeof StyleSheet.create>[0][string];
+
 function AnswerGrid({
     questions,
     columns,
@@ -213,9 +215,7 @@ function AnswerGrid({
 }: {
     questions: Question[];
     columns: number;
-    itemStyle?:
-        | StyleSheet.NamedStyles<object>[string]
-        | StyleSheet.NamedStyles<object>[string][];
+    itemStyle?: PdfStyle | PdfStyle[];
     children: (question: Question) => React.ReactNode;
 }) {
     return (

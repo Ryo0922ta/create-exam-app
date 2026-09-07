@@ -10,7 +10,7 @@ import {
     groupQuestions,
     validateLayoutSettings,
 } from "@/lib/examLayout";
-import { generateExamPdf } from "@/lib/generateExamPdf";
+import { generateExamPdf, PdfDownloadTarget } from "@/lib/generateExamPdf";
 import { LayoutSettings, QuestionLayout } from "@/types/layout";
 import { Question } from "@/types/question";
 import {
@@ -98,7 +98,7 @@ export default function Home() {
         setIsSettingsModalOpen(false);
     };
 
-    const handlePdfDownload = async () => {
+    const handlePdfDownload = async (target: PdfDownloadTarget = "all") => {
         if (!appliedSettings || isGeneratingPdf) return;
 
         setIsGeneratingPdf(true);
@@ -107,6 +107,7 @@ export default function Home() {
         try {
             await generateExamPdf({
                 fileName,
+                target,
                 previewQuestions: questionExamPreview.previewQuestions,
                 choiceQuestions: answerExamPreview.choiceQuestions,
                 wordQuestions: answerExamPreview.wordQuestions,
