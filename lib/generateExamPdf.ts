@@ -1,10 +1,6 @@
+import { NumberedQuestion } from "@/types/exam";
 import { LayoutSettings } from "@/types/layout";
 import { Question } from "@/types/question";
-
-type NumberedQuestion = {
-    question: Question;
-    displayNumber: number;
-};
 
 type GenerateExamPdfOptions = {
     fileName: string | null;
