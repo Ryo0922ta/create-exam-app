@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, ChangeEvent, DragEvent } from "react";
+import Link from "next/link";
 import { CsvUploader } from "@/components/CsvUploader";
 import { LayoutSettingsModal } from "@/components/LayoutSettingsModal";
 import { PreviewPanel } from "@/components/PreviewPanel";
@@ -257,14 +258,37 @@ export default function Home() {
 
     return (
         <main className="min-h-screen py-10 px-4 sm:px-6 lg:px-8 max-w-6xl mx-auto">
-            <header className="mb-8 text-center sm:text-left border-b border-gray-200 pb-5">
-                <h1 className="text-3xl font-bold tracking-tight text-gray-900">
-                    CSV プレビューアプリ（Phase 1）
-                </h1>
-                <p className="mt-2 text-sm text-gray-600">
-                    4択・単語回答・自由記述対応のCSVファイル（Shift-JIS /
-                    UTF-8）をアップロードして問題用紙・解答用紙をプレビューできます。
-                </p>
+            <header className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-gray-200 pb-5 gap-4">
+                <div>
+                    <h1 className="text-3xl font-bold tracking-tight text-gray-900">
+                        CSV プレビューアプリ（Phase 1）
+                    </h1>
+                    <p className="mt-2 text-sm text-gray-600">
+                        4択・単語回答・自由記述対応のCSVファイル（Shift-JIS /
+                        UTF-8）をアップロードして問題用紙・解答用紙をプレビューできます。
+                    </p>
+                </div>
+                <div className="flex-shrink-0">
+                    <Link
+                        href="/editor"
+                        className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm transition"
+                    >
+                        <svg
+                            className="w-4 h-4"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                        >
+                            <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth="2"
+                                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                            />
+                        </svg>
+                        解答用紙エディタを開く
+                    </Link>
+                </div>
             </header>
             <CsvUploader
                 fileInputRef={fileInputRef}
