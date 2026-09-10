@@ -1,337 +1,205 @@
 "use client";
 
-import React, { useState } from "react";
-import { LabelType, PaperSize, ShortAnswerOptions } from "@/types/editor";
-import { PAPER_SIZES } from "@/lib/editor/paperSizes";
+import React from "react";
 
 interface EditorToolbarProps {
-    paperSize: PaperSize;
-    onPaperSizeChange: (size: PaperSize) => void;
-    onAddShortAnswer: (options: ShortAnswerOptions) => void;
-    onAddEssay: (lines: number) => void;
-    onAddCharGrid: (chars: number) => void;
-    onAddTitle: () => void;
+    onOpenQuestionModal: () => void;
+    onOpenImportModal: () => void;
     onAddHeader: () => void;
-    onBringToFront: () => void;
-    onSendToBack: () => void;
-    onDuplicate: () => void;
+    onAddNamebox: () => void;
+    onAddScoretable: () => void;
+    onClone: () => void;
     onDelete: () => void;
-    onClear: () => void;
-    onRestoreSample: () => void;
-    onExportPdf: () => void;
-    isExportingPdf: boolean;
-    selectedInfo: string | null;
+    isGridVisible: boolean;
+    onToggleGrid: (visible: boolean) => void;
+    isSnapEnabled: boolean;
+    onToggleSnap: (enabled: boolean) => void;
+    isAlignmentGuidesEnabled: boolean;
+    onToggleAlignmentGuides: (enabled: boolean) => void;
+    zoomLevel: number;
+    onZoomIn: () => void;
+    onZoomOut: () => void;
+    onZoomFit: () => void;
 }
 
 export const EditorToolbar: React.FC<EditorToolbarProps> = ({
-    paperSize,
-    onPaperSizeChange,
-    onAddShortAnswer,
-    onAddEssay,
-    onAddCharGrid,
-    onAddTitle,
+    onOpenQuestionModal,
+    onOpenImportModal,
     onAddHeader,
-    onBringToFront,
-    onSendToBack,
-    onDuplicate,
+    onAddNamebox,
+    onAddScoretable,
+    onClone,
     onDelete,
-    onClear,
-    onRestoreSample,
-    onExportPdf,
-    isExportingPdf,
-    selectedInfo,
+    isGridVisible,
+    onToggleGrid,
+    isSnapEnabled,
+    onToggleSnap,
+    isAlignmentGuidesEnabled,
+    onToggleAlignmentGuides,
+    zoomLevel,
+    onZoomIn,
+    onZoomOut,
+    onZoomFit,
 }) => {
-    // 短答用ローカルステート
-    const [qNo, setQNo] = useState("1");
-    const [subNo, setSubNo] = useState("(1)");
-    const [shortRows, setShortRows] = useState(3);
-    const [shortCols, setShortCols] = useState(4);
-    const [labelType, setLabelType] = useState<LabelType>("alpha");
-
-    // 記述用
-    const [essayLines, setEssayLines] = useState(2);
-
-    // マス目用
-    const [gridChars, setGridChars] = useState(20);
-
-    const handleAddShortAnswer = () => {
-        onAddShortAnswer({
-            qNo,
-            subNo,
-            rows: Number(shortRows) || 3,
-            cols: Number(shortCols) || 4,
-            labelType,
-        });
-    };
-
-    const handleAddEssay = () => {
-        onAddEssay(Number(essayLines) || 2);
-    };
-
-    const handleAddCharGrid = () => {
-        onAddCharGrid(Number(gridChars) || 20);
-    };
-
     return (
-        <div className="flex flex-col gap-2 bg-slate-100 border-b border-slate-300 p-3 shadow-sm select-none">
-            {/* 上段：主要アクションバー */}
-            <div className="flex flex-wrap items-center justify-between gap-3">
-                {/* 用紙サイズ設定 */}
-                <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg border border-slate-300 shadow-sm">
-                    <label
-                        htmlFor="paper-size-select"
-                        className="text-xs font-semibold text-slate-700 flex items-center gap-1"
+        <div className="bg-white border-b border-slate-200 px-4 py-2 flex flex-wrap items-center justify-between gap-2 z-20 flex-shrink-0 shadow-xs select-none">
+            {/* 左側：大問追加、自動インポート、基本パーツ、オブジェクト操作 */}
+            <div className="flex items-center flex-wrap gap-2">
+                {/* 大問作成ボタン */}
+                <button
+                    type="button"
+                    onClick={onOpenQuestionModal}
+                    className="px-3 py-1.5 text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white rounded shadow-xs flex items-center gap-1.5 transition"
+                >
+                    <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
                     >
-                        <svg
-                            className="w-4 h-4 text-slate-500"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                        >
-                            <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth="2"
-                                d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"
-                            />
-                        </svg>
-                        用紙サイズ:
-                    </label>
-                    <select
-                        id="paper-size-select"
-                        value={paperSize}
-                        onChange={(e) =>
-                            onPaperSizeChange(e.target.value as PaperSize)
-                        }
-                        className="text-xs font-bold text-blue-700 bg-blue-50 border border-blue-200 rounded px-2 py-1 outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                        <option value="A4">{PAPER_SIZES.A4.label}</option>
-                        <option value="B4">{PAPER_SIZES.B4.label}</option>
-                    </select>
-                </div>
+                        <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth="2"
+                            d="M12 4v16m8-8H4"
+                        />
+                    </svg>
+                    <span>大問を作成・追加</span>
+                </button>
 
-                {/* キャンバス管理＆PDF出力 */}
-                <div className="flex items-center gap-2">
-                    <button
-                        type="button"
-                        onClick={onRestoreSample}
-                        className="px-3 py-1.5 text-xs font-medium bg-slate-700 hover:bg-slate-600 text-white rounded shadow-sm transition"
-                        title="見本レイアウトを読み込む"
+                {/* 問題文自動インポートボタン */}
+                <button
+                    type="button"
+                    onClick={onOpenImportModal}
+                    className="px-3 py-1.5 text-xs font-bold bg-purple-600 hover:bg-purple-500 text-white rounded shadow-xs flex items-center gap-1.5 transition"
+                >
+                    <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
                     >
-                        サンプル復元
-                    </button>
-                    <button
-                        type="button"
-                        onClick={onClear}
-                        className="px-3 py-1.5 text-xs font-medium bg-slate-700 hover:bg-red-600/90 text-white rounded shadow-sm transition"
-                        title="キャンバスを空にする"
-                    >
-                        全消去
-                    </button>
-                    <div className="h-5 w-px bg-slate-300 mx-1"></div>
-                    <button
-                        type="button"
-                        onClick={onExportPdf}
-                        disabled={isExportingPdf}
-                        className="px-4 py-1.5 text-xs font-bold bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded shadow flex items-center gap-1.5 transition"
-                    >
-                        {isExportingPdf ? (
-                            <>
-                                <span className="inline-block animate-spin rounded-full h-3.5 w-3.5 border-2 border-white border-t-transparent"></span>
-                                出力中...
-                            </>
-                        ) : (
-                            <>
-                                <svg
-                                    className="w-4 h-4"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                >
-                                    <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        strokeWidth="2"
-                                        d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                                    />
-                                </svg>
-                                {paperSize} PDF出力
-                            </>
-                        )}
-                    </button>
-                </div>
+                        <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth="2"
+                            d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"
+                        />
+                    </svg>
+                    <span>問題文から自動インポート</span>
+                </button>
+
+                <div className="h-5 w-px bg-slate-300 mx-1"></div>
+
+                {/* 基本パーツ */}
+                <span className="text-[11px] font-semibold text-slate-500">
+                    基本パーツ:
+                </span>
+                <button
+                    type="button"
+                    onClick={onAddHeader}
+                    className="px-2.5 py-1 text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 rounded border border-slate-300 font-medium transition flex items-center gap-1"
+                >
+                    <span>+ 考査見出し枠</span>
+                </button>
+                <button
+                    type="button"
+                    onClick={onAddNamebox}
+                    className="px-2.5 py-1 text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 rounded border border-slate-300 font-medium transition flex items-center gap-1"
+                >
+                    <span>+ 年組氏名欄</span>
+                </button>
+                <button
+                    type="button"
+                    onClick={onAddScoretable}
+                    className="px-2.5 py-1 text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 rounded border border-slate-300 font-medium transition flex items-center gap-1"
+                >
+                    <span>+ 観点別得点枠</span>
+                </button>
+
+                <div className="h-5 w-px bg-slate-300 mx-1"></div>
+
+                {/* 選択オブジェクト操作 */}
+                <button
+                    type="button"
+                    onClick={onClone}
+                    className="px-2 py-1 text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 rounded border border-slate-300 transition font-medium"
+                    title="選択中の枠を複製"
+                >
+                    複製
+                </button>
+                <button
+                    type="button"
+                    onClick={onDelete}
+                    className="px-2 py-1 text-xs bg-slate-100 hover:bg-red-50 text-red-600 hover:border-red-300 rounded border border-slate-300 transition font-medium"
+                    title="選択中の枠を削除 (Deleteキー)"
+                >
+                    削除
+                </button>
             </div>
 
-            {/* 下段：パーツ追加ブロック ＆ 選択オブジェクト操作 */}
-            <div className="flex flex-wrap items-center gap-3 pt-1 border-t border-slate-200">
-                {/* 短答作成ブロック */}
-                <div className="flex items-center bg-white p-1 rounded-lg border border-slate-300 shadow-sm gap-2">
-                    <button
-                        type="button"
-                        onClick={handleAddShortAnswer}
-                        className="px-2.5 py-1.5 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white rounded transition shadow-sm flex items-center gap-1"
-                    >
-                        <span>+ 短答欄</span>
-                    </button>
-                    <div className="flex items-center text-xs text-slate-600 gap-1 pl-1">
-                        <span>大問:</span>
-                        <input
-                            type="text"
-                            value={qNo}
-                            onChange={(e) => setQNo(e.target.value)}
-                            className="w-8 border border-slate-300 rounded px-1 text-center py-0.5 font-bold"
-                        />
-                        <span>小問:</span>
-                        <input
-                            type="text"
-                            value={subNo}
-                            onChange={(e) => setSubNo(e.target.value)}
-                            className="w-10 border border-slate-300 rounded px-1 text-center py-0.5"
-                        />
-                        <span>行:</span>
-                        <input
-                            type="number"
-                            value={shortRows}
-                            min="1"
-                            max="10"
-                            onChange={(e) =>
-                                setShortRows(parseInt(e.target.value, 10) || 1)
-                            }
-                            className="w-10 border border-slate-300 rounded px-1 text-center py-0.5"
-                        />
-                        <span>列:</span>
-                        <input
-                            type="number"
-                            value={shortCols}
-                            min="1"
-                            max="8"
-                            onChange={(e) =>
-                                setShortCols(parseInt(e.target.value, 10) || 1)
-                            }
-                            className="w-10 border border-slate-300 rounded px-1 text-center py-0.5"
-                        />
-                        <span>記号:</span>
-                        <select
-                            value={labelType}
-                            onChange={(e) =>
-                                setLabelType(e.target.value as LabelType)
-                            }
-                            className="border border-slate-300 rounded text-xs py-0.5 px-1 bg-white"
-                        >
-                            <option value="alpha">a, b, c...</option>
-                            <option value="num">1, 2, 3...</option>
-                            <option value="kata">ア, イ, ウ...</option>
-                            <option value="kanji">一, 二, 三...</option>
-                            <option value="none">なし</option>
-                        </select>
-                    </div>
-                </div>
+            {/* 右側：グリッド・スナップ・ズーム */}
+            <div className="flex items-center gap-3">
+                <label className="flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer font-medium">
+                    <input
+                        type="checkbox"
+                        checked={isGridVisible}
+                        onChange={(e) => onToggleGrid(e.target.checked)}
+                        className="rounded text-indigo-600 focus:ring-indigo-500"
+                    />
+                    <span>方眼グリッド</span>
+                </label>
+                <label className="flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer font-medium">
+                    <input
+                        type="checkbox"
+                        checked={isSnapEnabled}
+                        onChange={(e) => onToggleSnap(e.target.checked)}
+                        className="rounded text-indigo-600 focus:ring-indigo-500"
+                    />
+                    <span>吸着(スナップ)</span>
+                </label>
+                <label className="flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer font-medium">
+                    <input
+                        type="checkbox"
+                        checked={isAlignmentGuidesEnabled}
+                        onChange={(e) =>
+                            onToggleAlignmentGuides(e.target.checked)
+                        }
+                        className="rounded text-rose-600 focus:ring-rose-500"
+                    />
+                    <span>配置ガイド</span>
+                </label>
 
-                {/* 記述・マス目作成ブロック */}
-                <div className="flex items-center bg-white p-1 rounded-lg border border-slate-300 shadow-sm gap-2">
-                    <button
-                        type="button"
-                        onClick={handleAddEssay}
-                        className="px-2.5 py-1.5 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded transition shadow-sm"
-                    >
-                        + 記述欄
-                    </button>
-                    <div className="flex items-center text-xs text-slate-600 gap-1 pl-1">
-                        <span>行数:</span>
-                        <input
-                            type="number"
-                            value={essayLines}
-                            min="1"
-                            max="10"
-                            onChange={(e) =>
-                                setEssayLines(parseInt(e.target.value, 10) || 1)
-                            }
-                            className="w-10 border border-slate-300 rounded px-1 text-center py-0.5"
-                        />
-                    </div>
-                    <div className="h-4 w-px bg-slate-200"></div>
-                    <button
-                        type="button"
-                        onClick={handleAddCharGrid}
-                        className="px-2.5 py-1.5 text-xs font-bold bg-teal-600 hover:bg-teal-700 text-white rounded transition shadow-sm"
-                    >
-                        + マス目
-                    </button>
-                    <div className="flex items-center text-xs text-slate-600 gap-1 pl-1">
-                        <input
-                            type="number"
-                            value={gridChars}
-                            min="5"
-                            max="100"
-                            onChange={(e) =>
-                                setGridChars(parseInt(e.target.value, 10) || 10)
-                            }
-                            className="w-12 border border-slate-300 rounded px-1 text-center py-0.5"
-                        />
-                        <span>字</span>
-                    </div>
-                </div>
+                <div className="h-5 w-px bg-slate-300"></div>
 
-                {/* 定番パーツ追加 */}
-                <div className="flex items-center bg-white p-1 rounded-lg border border-slate-300 shadow-sm gap-1.5">
+                {/* ズーム操作 */}
+                <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-0.5 border border-slate-300">
                     <button
                         type="button"
-                        onClick={onAddTitle}
-                        className="px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100 rounded border border-slate-200 transition"
+                        onClick={onZoomOut}
+                        className="w-6 h-6 flex items-center justify-center text-slate-600 hover:bg-white rounded transition text-xs font-bold"
+                        title="縮小"
                     >
-                        + タイトル
+                        -
                     </button>
-                    <button
-                        type="button"
-                        onClick={onAddHeader}
-                        className="px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100 rounded border border-slate-200 transition"
-                    >
-                        + 年組氏名・得点欄
-                    </button>
-                </div>
-
-                {/* 選択オブジェクト用操作バー */}
-                <div className="flex items-center gap-1.5 ml-auto">
-                    <span className="text-xs text-slate-500 hidden xl:inline">
-                        {selectedInfo ? (
-                            <span className="text-blue-600 font-semibold">
-                                選択中: {selectedInfo}
-                            </span>
-                        ) : (
-                            "未選択"
-                        )}
+                    <span className="text-[11px] font-semibold text-slate-700 px-1 w-12 text-center">
+                        {Math.round(zoomLevel * 100)}%
                     </span>
                     <button
                         type="button"
-                        onClick={onBringToFront}
-                        className="p-1.5 text-slate-700 bg-white border border-slate-300 rounded hover:bg-slate-100 shadow-sm text-xs"
-                        title="前面へ"
+                        onClick={onZoomIn}
+                        className="w-6 h-6 flex items-center justify-center text-slate-600 hover:bg-white rounded transition text-xs font-bold"
+                        title="拡大"
                     >
-                        ▲
+                        +
                     </button>
                     <button
                         type="button"
-                        onClick={onSendToBack}
-                        className="p-1.5 text-slate-700 bg-white border border-slate-300 rounded hover:bg-slate-100 shadow-sm text-xs"
-                        title="背面へ"
+                        onClick={onZoomFit}
+                        className="px-2 h-6 flex items-center justify-center text-[11px] font-medium text-slate-700 hover:bg-white rounded transition"
+                        title="全体を表示"
                     >
-                        ▼
-                    </button>
-                    <button
-                        type="button"
-                        onClick={onDuplicate}
-                        className="px-2 py-1.5 text-slate-700 bg-white border border-slate-300 rounded hover:bg-slate-100 shadow-sm text-xs font-semibold"
-                        title="複製"
-                    >
-                        複製
-                    </button>
-                    <button
-                        type="button"
-                        onClick={onDelete}
-                        className="px-2 py-1.5 text-red-600 bg-white border border-red-200 rounded hover:bg-red-50 shadow-sm text-xs font-bold"
-                        title="削除"
-                    >
-                        削除
+                        画面に合わせる
                     </button>
                 </div>
             </div>
