@@ -30,9 +30,36 @@ export interface QuestionBlockConfig {
     circleCommaPaddingRatio?: number;
     splitRatio: "50:50" | "30:70" | "70:30" | string;
     splitHeight: number;
+    /** 大問ブロック全体の横幅（px）。未指定時は SECTION_STANDARD_WIDTH */
+    blockWidth?: number;
 }
 
 export type LabelType = "alpha" | "num" | "kata" | "kanji" | "none";
+
+export type EditorBlockType =
+    | "question-block"
+    | "exam-header"
+    | "namebox"
+    | "score-table";
+
+export interface ExamHeaderConfig {
+    text: string;
+    width: number;
+    height: number;
+}
+
+export interface NameboxConfig {
+    width: number;
+    height: number;
+    labels: [string, string, string, string];
+}
+
+export interface ScoreTableConfig {
+    width: number;
+    height: number;
+    colHeaders: [string, string, string];
+    maxScores: [string, string, string];
+}
 
 export interface ShortAnswerOptions {
     qNo?: string;
@@ -75,3 +102,23 @@ export interface PaperSizeConfig {
     pdfWidthPt: number;
     pdfHeightPt: number;
 }
+
+export interface PaperMargins {
+    verticalMm: number;
+    /** 用紙外端（左端・右端）からの余白 */
+    outerHorizontalMm: number;
+    /** 中央折り目付近（折り目内側）からの余白 */
+    foldHorizontalMm: number;
+}
+
+export const DEFAULT_PAPER_MARGINS: PaperMargins = {
+    verticalMm: 10,
+    outerHorizontalMm: 10,
+    foldHorizontalMm: 5,
+};
+
+export const MARGIN_LIMITS = {
+    vertical: { min: 5, max: 25 },
+    outerHorizontal: { min: 5, max: 20 },
+    foldHorizontal: { min: 5, max: 20 },
+} as const;

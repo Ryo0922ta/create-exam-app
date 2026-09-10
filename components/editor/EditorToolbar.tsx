@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { MARGIN_LIMITS, PaperMargins } from "@/types/editor";
 
 interface EditorToolbarProps {
     onOpenQuestionModal: () => void;
@@ -10,12 +11,19 @@ interface EditorToolbarProps {
     onAddScoretable: () => void;
     onClone: () => void;
     onDelete: () => void;
+    hasEditableSelection: boolean;
+    isPropertyPanelOpen: boolean;
+    onTogglePropertyPanel: () => void;
     isGridVisible: boolean;
     onToggleGrid: (visible: boolean) => void;
     isSnapEnabled: boolean;
     onToggleSnap: (enabled: boolean) => void;
     isAlignmentGuidesEnabled: boolean;
     onToggleAlignmentGuides: (enabled: boolean) => void;
+    isMarginGuidesVisible: boolean;
+    onToggleMarginGuides: (visible: boolean) => void;
+    paperMargins: PaperMargins;
+    onPaperMarginsChange: (margins: PaperMargins) => void;
     zoomLevel: number;
     onZoomIn: () => void;
     onZoomOut: () => void;
@@ -30,12 +38,19 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
     onAddScoretable,
     onClone,
     onDelete,
+    hasEditableSelection,
+    isPropertyPanelOpen,
+    onTogglePropertyPanel,
     isGridVisible,
     onToggleGrid,
     isSnapEnabled,
     onToggleSnap,
     isAlignmentGuidesEnabled,
     onToggleAlignmentGuides,
+    isMarginGuidesVisible,
+    onToggleMarginGuides,
+    paperMargins,
+    onPaperMarginsChange,
     zoomLevel,
     onZoomIn,
     onZoomOut,
@@ -122,6 +137,32 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
                 {/* 選択オブジェクト操作 */}
                 <button
                     type="button"
+                    onClick={onTogglePropertyPanel}
+                    disabled={!hasEditableSelection}
+                    className={`px-2.5 py-1 text-xs rounded border font-medium transition flex items-center gap-1 ${
+                        isPropertyPanelOpen
+                            ? "bg-indigo-600 border-indigo-600 text-white"
+                            : "bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300 disabled:opacity-40 disabled:cursor-not-allowed"
+                    }`}
+                    title="選択中の枠のプロパティを編集"
+                >
+                    <svg
+                        className="w-3.5 h-3.5"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                    >
+                        <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth="2"
+                            d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                        />
+                    </svg>
+                    <span>プロパティ</span>
+                </button>
+                <button
+                    type="button"
                     onClick={onClone}
                     className="px-2 py-1 text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 rounded border border-slate-300 transition font-medium"
                     title="選択中の枠を複製"
@@ -169,6 +210,81 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
                     />
                     <span>配置ガイド</span>
                 </label>
+                <label className="flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer font-medium">
+                    <input
+                        type="checkbox"
+                        checked={isMarginGuidesVisible}
+                        onChange={(e) => onToggleMarginGuides(e.target.checked)}
+                        className="rounded text-amber-600 focus:ring-amber-500"
+                    />
+                    <span>余白ガイド</span>
+                </label>
+
+                <div className="flex items-center gap-2 text-xs text-slate-600">
+                    <label className="flex items-center gap-1 font-medium whitespace-nowrap">
+                        <span>上下</span>
+                        <input
+                            type="range"
+                            min={MARGIN_LIMITS.vertical.min}
+                            max={MARGIN_LIMITS.vertical.max}
+                            step={1}
+                            value={paperMargins.verticalMm}
+                            disabled={!isMarginGuidesVisible}
+                            onChange={(e) =>
+                                onPaperMarginsChange({
+                                    ...paperMargins,
+                                    verticalMm: Number(e.target.value),
+                                })
+                            }
+                            className="w-16 accent-amber-600 disabled:opacity-40"
+                        />
+                        <span className="w-9 text-right tabular-nums">
+                            {paperMargins.verticalMm}mm
+                        </span>
+                    </label>
+                    <label className="flex items-center gap-1 font-medium whitespace-nowrap">
+                        <span>外側</span>
+                        <input
+                            type="range"
+                            min={MARGIN_LIMITS.outerHorizontal.min}
+                            max={MARGIN_LIMITS.outerHorizontal.max}
+                            step={1}
+                            value={paperMargins.outerHorizontalMm}
+                            disabled={!isMarginGuidesVisible}
+                            onChange={(e) =>
+                                onPaperMarginsChange({
+                                    ...paperMargins,
+                                    outerHorizontalMm: Number(e.target.value),
+                                })
+                            }
+                            className="w-16 accent-amber-600 disabled:opacity-40"
+                        />
+                        <span className="w-9 text-right tabular-nums">
+                            {paperMargins.outerHorizontalMm}mm
+                        </span>
+                    </label>
+                    <label className="flex items-center gap-1 font-medium whitespace-nowrap">
+                        <span>折り目</span>
+                        <input
+                            type="range"
+                            min={MARGIN_LIMITS.foldHorizontal.min}
+                            max={MARGIN_LIMITS.foldHorizontal.max}
+                            step={1}
+                            value={paperMargins.foldHorizontalMm}
+                            disabled={!isMarginGuidesVisible}
+                            onChange={(e) =>
+                                onPaperMarginsChange({
+                                    ...paperMargins,
+                                    foldHorizontalMm: Number(e.target.value),
+                                })
+                            }
+                            className="w-16 accent-amber-600 disabled:opacity-40"
+                        />
+                        <span className="w-9 text-right tabular-nums">
+                            {paperMargins.foldHorizontalMm}mm
+                        </span>
+                    </label>
+                </div>
 
                 <div className="h-5 w-px bg-slate-300"></div>
 

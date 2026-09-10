@@ -1,6 +1,9 @@
 import { fabric } from "fabric";
 import { QuestionBlockConfig } from "@/types/editor";
-import { SECTION_STANDARD_WIDTH } from "@/lib/editor/paperSizes";
+import {
+    SECTION_STANDARD_WIDTH,
+    clampQuestionBlockWidth,
+} from "@/lib/editor/paperSizes";
 
 const CIRCLE_COMMA_RATIO_ANCHORS: [number, number][] = [
     [3, 0.467],
@@ -185,12 +188,25 @@ export interface CustomQuestionBlockGroup extends fabric.Group {
  * モーダル等の設定情報（QuestionBlockConfig）から、Fabric.jsのグループオブジェクトを生成する。
  * 各子オブジェクトの座標を相対配置で正しく計算し、確実にキャンバスへ配置できるようにする。
  */
+export function resolveQuestionBlockWidth(
+    cfg: QuestionBlockConfig,
+    override?: number,
+): number {
+    if (override !== undefined) {
+        return clampQuestionBlockWidth(override);
+    }
+    return clampQuestionBlockWidth(
+        cfg.blockWidth ?? SECTION_STANDARD_WIDTH,
+    );
+}
+
 export function createQuestionBlock(
     cfg: QuestionBlockConfig,
     left: number = 50,
     top: number = 50,
-    blockWidth: number = SECTION_STANDARD_WIDTH,
+    blockWidthOverride?: number,
 ): CustomQuestionBlockGroup {
+    const blockWidth = resolveQuestionBlockWidth(cfg, blockWidthOverride);
     const items: fabric.Object[] = [];
 
     // 1. 大問番号
@@ -413,7 +429,9 @@ export function createQuestionBlock(
     }) as CustomQuestionBlockGroup;
 
     group.customType = "question-block";
-    group.questionConfig = JSON.parse(JSON.stringify(cfg));
+    group.questionConfig = JSON.parse(
+        JSON.stringify({ ...cfg, blockWidth }),
+    );
     group.setCoords();
 
     return group;
@@ -425,8 +443,9 @@ export function createQuestionBlock(
 export function drawModalPreviewCanvas(
     canvas: HTMLCanvasElement,
     cfg: QuestionBlockConfig,
-    width: number = 580,
+    width?: number,
 ): void {
+    const resolvedWidth = resolveQuestionBlockWidth(cfg, width);
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
@@ -442,14 +461,14 @@ export function drawModalPreviewCanvas(
 
     const dpr =
         typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
-    canvas.width = width * dpr;
+    canvas.width = resolvedWidth * dpr;
     canvas.height = totalH * dpr;
-    canvas.style.width = `${width}px`;
+    canvas.style.width = `${resolvedWidth}px`;
     canvas.style.height = `${totalH}px`;
 
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.scale(dpr, dpr);
-    ctx.clearRect(0, 0, width, totalH);
+    ctx.clearRect(0, 0, resolvedWidth, totalH);
 
     // 大問番号
     ctx.fillStyle = "#000000";
@@ -470,7 +489,7 @@ export function drawModalPreviewCanvas(
 
     if (cfg.pattern === "sub_parens") {
         const cols = cfg.subCols || 1;
-        const cellW = width / cols;
+        const cellW = resolvedWidth / cols;
         for (let r = 0; r < cfg.subRows; r++) {
             const y = tableTop + r * cfg.subRowHeight;
             for (let c = 0; c < cols; c++) {
@@ -492,7 +511,7 @@ export function drawModalPreviewCanvas(
         }
     } else if (cfg.pattern === "grid") {
         const cols = cfg.gridCols || 1;
-        const cellW = width / cols;
+        const cellW = resolvedWidth / cols;
         for (let r = 0; r < cfg.gridRows; r++) {
             const y = tableTop + r * cfg.gridRowHeight;
             for (let c = 0; c < cols; c++) {
@@ -500,8 +519,8 @@ export function drawModalPreviewCanvas(
             }
         }
     } else if (cfg.pattern === "circle_comma") {
-        const layout = buildCircleCommaLayout(cfg, width);
-        ctx.strokeRect(0, tableTop, width, layout.totalHeight);
+        const layout = buildCircleCommaLayout(cfg, resolvedWidth);
+        ctx.strokeRect(0, tableTop, resolvedWidth, layout.totalHeight);
 
         for (let i = 1; i < layout.cols; i++) {
             const x = i * layout.cellW;
@@ -515,7 +534,7 @@ export function drawModalPreviewCanvas(
             const y = tableTop + r * layout.rowHeight;
             ctx.beginPath();
             ctx.moveTo(0, y);
-            ctx.lineTo(width, y);
+            ctx.lineTo(resolvedWidth, y);
             ctx.stroke();
         }
 
@@ -544,10 +563,10 @@ export function drawModalPreviewCanvas(
             }
         }
     } else if (cfg.pattern === "split_2") {
-        let leftW = width * 0.5;
-        if (cfg.splitRatio === "30:70") leftW = width * 0.3;
-        if (cfg.splitRatio === "70:30") leftW = width * 0.7;
+        let leftW = resolvedWidth * 0.5;
+        if (cfg.splitRatio === "30:70") leftW = resolvedWidth * 0.3;
+        if (cfg.splitRatio === "70:30") leftW = resolvedWidth * 0.7;
         ctx.strokeRect(0, tableTop, leftW, cfg.splitHeight);
-        ctx.strokeRect(leftW, tableTop, width - leftW, cfg.splitHeight);
+        ctx.strokeRect(leftW, tableTop, resolvedWidth - leftW, cfg.splitHeight);
     }
 }

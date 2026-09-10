@@ -28,5 +28,38 @@ export const PAPER_SIZES: Record<PaperSize, PaperSizeConfig> = {
 };
 
 export const DEFAULT_PAPER_SIZE: PaperSize = "B4_LANDSCAPE";
-export const GRID_SNAP_SIZE = 20;
-export const SECTION_STANDARD_WIDTH = 610;
+
+export const B4_LANDSCAPE_MM = { width: 364, height: 257 };
+
+export function mmToPx(mm: number, axis: "x" | "y"): number {
+    const b4 = PAPER_SIZES.B4_LANDSCAPE;
+    const mmSize =
+        axis === "x" ? B4_LANDSCAPE_MM.width : B4_LANDSCAPE_MM.height;
+    const pxSize = axis === "x" ? b4.widthPx : b4.heightPx;
+    return mm * (pxSize / mmSize);
+}
+
+/** 方眼グリッド1マスの実寸（余白ガイド5mm時の角マスと同じ） */
+export const GRID_CELL_MM = 5;
+
+/** 太線方眼のマス数（5マス = 25mm） */
+export const GRID_MAJOR_CELL_COUNT = 5;
+
+/** 方眼スナップ間隔（px・用紙座標系）。横方向の5mm相当 */
+export const GRID_SNAP_SIZE = mmToPx(GRID_CELL_MM, "x");
+
+export function getGridCellSizePx(axis: "x" | "y"): number {
+    return mmToPx(GRID_CELL_MM, axis);
+}
+
+export const SECTION_STANDARD_WIDTH = 630;
+
+export const QUESTION_BLOCK_WIDTH_LIMITS = {
+    min: 200,
+    max: 1200,
+} as const;
+
+export function clampQuestionBlockWidth(width: number): number {
+    const { min, max } = QUESTION_BLOCK_WIDTH_LIMITS;
+    return Math.min(max, Math.max(min, Math.round(width) || SECTION_STANDARD_WIDTH));
+}

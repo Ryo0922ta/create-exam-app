@@ -12,6 +12,11 @@ import {
     drawModalPreviewCanvas,
     getDefaultCircleCommaPaddingRatio,
 } from "@/lib/editor/questionBlockBuilder";
+import {
+    SECTION_STANDARD_WIDTH,
+    QUESTION_BLOCK_WIDTH_LIMITS,
+    clampQuestionBlockWidth,
+} from "@/lib/editor/paperSizes";
 
 interface QuestionEditModalProps {
     isOpen: boolean;
@@ -57,6 +62,7 @@ export const QuestionEditModal: React.FC<QuestionEditModalProps> = ({
     // 2分割
     const [splitRatio, setSplitRatio] = useState("50:50");
     const [splitHeight, setSplitHeight] = useState(38);
+    const [blockWidth, setBlockWidth] = useState(SECTION_STANDARD_WIDTH);
 
     // 初期化
     useEffect(() => {
@@ -95,6 +101,9 @@ export const QuestionEditModal: React.FC<QuestionEditModalProps> = ({
             );
             setSplitRatio(initialConfig.splitRatio || "50:50");
             setSplitHeight(initialConfig.splitHeight || 38);
+            setBlockWidth(
+                initialConfig.blockWidth ?? SECTION_STANDARD_WIDTH,
+            );
         } else {
             setNum("1");
             setRubric("○・△・×");
@@ -117,6 +126,7 @@ export const QuestionEditModal: React.FC<QuestionEditModalProps> = ({
             );
             setSplitRatio("50:50");
             setSplitHeight(38);
+            setBlockWidth(SECTION_STANDARD_WIDTH);
         }
     }, [isOpen, initialConfig]);
 
@@ -155,6 +165,9 @@ export const QuestionEditModal: React.FC<QuestionEditModalProps> = ({
             circleCommaPaddingRatio,
             splitRatio,
             splitHeight: Number(splitHeight) || 38,
+            blockWidth: clampQuestionBlockWidth(
+                Number(blockWidth) || SECTION_STANDARD_WIDTH,
+            ),
         };
     }, [
         num,
@@ -176,16 +189,13 @@ export const QuestionEditModal: React.FC<QuestionEditModalProps> = ({
         circleCommaPaddingRatio,
         splitRatio,
         splitHeight,
+        blockWidth,
     ]);
 
     // プレビュー再描画
     useLayoutEffect(() => {
         if (!isOpen || !previewCanvasRef.current) return;
-        drawModalPreviewCanvas(
-            previewCanvasRef.current,
-            getCurrentConfig(),
-            580,
-        );
+        drawModalPreviewCanvas(previewCanvasRef.current, getCurrentConfig());
     }, [isOpen, getCurrentConfig]);
 
     if (!isOpen) return null;
@@ -266,6 +276,59 @@ export const QuestionEditModal: React.FC<QuestionEditModalProps> = ({
                                 className="w-full px-2.5 py-1.5 border border-slate-300 rounded bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                             />
                         </div>
+                    </div>
+
+                    <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-2">
+                        <div className="flex items-center justify-between">
+                            <label className="text-slate-700 font-semibold">
+                                大問の横幅
+                            </label>
+                            <div className="flex items-center gap-1">
+                                <input
+                                    type="number"
+                                    min={QUESTION_BLOCK_WIDTH_LIMITS.min}
+                                    max={QUESTION_BLOCK_WIDTH_LIMITS.max}
+                                    step={4}
+                                    value={blockWidth}
+                                    onChange={(e) =>
+                                        setBlockWidth(Number(e.target.value))
+                                    }
+                                    onBlur={() =>
+                                        setBlockWidth(
+                                            clampQuestionBlockWidth(blockWidth),
+                                        )
+                                    }
+                                    onKeyDown={(e) => {
+                                        if (e.key === "Enter") {
+                                            setBlockWidth(
+                                                clampQuestionBlockWidth(
+                                                    blockWidth,
+                                                ),
+                                            );
+                                        }
+                                    }}
+                                    className="w-16 px-1.5 py-0.5 border border-slate-300 rounded text-right tabular-nums bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                                />
+                                <span className="text-slate-500 text-[10px]">
+                                    px
+                                </span>
+                            </div>
+                        </div>
+                        <input
+                            type="range"
+                            min={QUESTION_BLOCK_WIDTH_LIMITS.min}
+                            max={QUESTION_BLOCK_WIDTH_LIMITS.max}
+                            step={4}
+                            value={blockWidth}
+                            onChange={(e) =>
+                                setBlockWidth(
+                                    clampQuestionBlockWidth(
+                                        Number(e.target.value),
+                                    ),
+                                )
+                            }
+                            className="w-full accent-indigo-600"
+                        />
                     </div>
 
                     {/* パターン選択 */}

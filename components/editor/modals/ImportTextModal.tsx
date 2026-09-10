@@ -10,6 +10,7 @@ import React, {
 import { QuestionBlockConfig } from "@/types/editor";
 import { extractSymbolsFromText } from "@/lib/editor/symbolParser";
 import { drawModalPreviewCanvas } from "@/lib/editor/questionBlockBuilder";
+import { SECTION_STANDARD_WIDTH } from "@/lib/editor/paperSizes";
 
 interface ImportTextModalProps {
     isOpen: boolean;
@@ -68,6 +69,7 @@ export const ImportTextModal: React.FC<ImportTextModalProps> = ({
             circleCommaPaddingAuto: true,
             splitRatio: "50:50",
             splitHeight: 38,
+            blockWidth: SECTION_STANDARD_WIDTH,
         };
     }, [qNum, qRubric, rows, cols, detectedSymbols]);
 
@@ -76,7 +78,6 @@ export const ImportTextModal: React.FC<ImportTextModalProps> = ({
         drawModalPreviewCanvas(
             previewCanvasRef.current,
             getPreviewConfig(),
-            580,
         );
     }, [isOpen, getPreviewConfig]);
 

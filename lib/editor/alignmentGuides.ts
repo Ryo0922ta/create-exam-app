@@ -1,4 +1,8 @@
 import { fabric } from "fabric";
+import {
+    getFaceRegion,
+    MarginRegions,
+} from "@/lib/editor/marginGuides";
 
 export const ALIGNMENT_SNAP_THRESHOLD = 8;
 export const ALIGNMENT_GUIDE_STROKE = "#f43f5e";
@@ -81,6 +85,18 @@ function withOffset(rect: BoundingRect, deltaX: number, deltaY: number): Boundin
     };
 }
 
+function overlapsY(a: BoundingRect, b: BoundingRect): boolean {
+    return a.top < b.bottom && a.bottom > b.top;
+}
+
+function overlapsX(a: BoundingRect, b: BoundingRect): boolean {
+    return a.left < b.right && a.right > b.left;
+}
+
+function isOnLeftFace(rect: BoundingRect, regions: MarginRegions): boolean {
+    return rect.centerX < regions.foldX;
+}
+
 function pickBestCandidate(
     candidates: SnapCandidate[],
     threshold: number,
@@ -98,7 +114,7 @@ function pickBestCandidate(
 function collectEdgeAlignCandidatesX(
     moving: BoundingRect,
     refs: BoundingRect[],
-    paperWidth: number,
+    regions: MarginRegions,
 ): SnapCandidate[] {
     const candidates: SnapCandidate[] = [];
     const movingEdges = [
@@ -107,28 +123,21 @@ function collectEdgeAlignCandidatesX(
         { val: moving.centerX, kind: "centerX" as const },
     ];
 
-    const paperLines = [
-        { x: 0, label: "paper-left" },
-        { x: paperWidth / 2, label: "paper-fold" },
-        { x: paperWidth, label: "paper-right" },
-    ];
+    const face = getFaceRegion(regions, moving.centerX);
+    const paperLines = [face.left, face.right];
 
-    for (const line of paperLines) {
+    for (const lineX of paperLines) {
         for (const edge of movingEdges) {
-            const delta = line.x - edge.val;
+            const delta = lineX - edge.val;
             candidates.push({
                 delta,
-                guides: [verticalGuide(line.x, moving, withOffset(moving, delta, 0))],
+                guides: [verticalGuide(lineX, moving, withOffset(moving, delta, 0))],
             });
         }
     }
 
     for (const ref of refs) {
-        const refEdges = [
-            ref.left,
-            ref.right,
-            ref.centerX,
-        ];
+        const refEdges = [ref.left, ref.right, ref.centerX];
         for (const refX of refEdges) {
             for (const edge of movingEdges) {
                 const delta = refX - edge.val;
@@ -147,7 +156,7 @@ function collectEdgeAlignCandidatesX(
 function collectEdgeAlignCandidatesY(
     moving: BoundingRect,
     refs: BoundingRect[],
-    paperHeight: number,
+    regions: MarginRegions,
 ): SnapCandidate[] {
     const candidates: SnapCandidate[] = [];
     const movingEdges = [
@@ -156,7 +165,7 @@ function collectEdgeAlignCandidatesY(
         { val: moving.centerY, kind: "centerY" as const },
     ];
 
-    const paperLines = [0, paperHeight];
+    const paperLines = [regions.fullHeight.top, regions.fullHeight.bottom];
 
     for (const lineY of paperLines) {
         for (const edge of movingEdges) {
@@ -313,12 +322,147 @@ function collectEqualSpacingCandidatesY(
     return candidates;
 }
 
+function buildDistributeXGuides(
+    L: number,
+    R: number,
+    ordered: BoundingRect[],
+    gap: number,
+): GuideLineSpec[] {
+    const extent = ordered;
+    const guides: GuideLineSpec[] = [verticalGuide(L, ...extent)];
+    let x = L + gap;
+    for (const obj of ordered) {
+        guides.push(verticalGuide(x, ...extent));
+        x += obj.width + gap;
+    }
+    guides.push(verticalGuide(R, ...extent));
+    return guides;
+}
+
+function buildDistributeYGuides(
+    T: number,
+    B: number,
+    ordered: BoundingRect[],
+    gap: number,
+): GuideLineSpec[] {
+    const extent = ordered;
+    const guides: GuideLineSpec[] = [horizontalGuide(T, ...extent)];
+    let y = T + gap;
+    for (const obj of ordered) {
+        guides.push(horizontalGuide(y, ...extent));
+        y += obj.height + gap;
+    }
+    guides.push(horizontalGuide(B, ...extent));
+    return guides;
+}
+
+function collectDistributeCandidatesX(
+    moving: BoundingRect,
+    refs: BoundingRect[],
+    regions: MarginRegions,
+): SnapCandidate[] {
+    const candidates: SnapCandidate[] = [];
+    const onLeft = isOnLeftFace(moving, regions);
+    const face = onLeft ? regions.leftFace : regions.rightFace;
+    const L = face.left;
+    const R = face.right;
+
+    const bandRefs = refs.filter(
+        (ref) =>
+            overlapsY(moving, ref) &&
+            (onLeft ? isOnLeftFace(ref, regions) : !isOnLeftFace(ref, regions)),
+    );
+
+    const sortedRefs = [...bandRefs].sort((a, b) => a.left - b.left);
+    const n = sortedRefs.length + 1;
+    if (n < 3) return candidates;
+
+    for (let insertIndex = 0; insertIndex < n; insertIndex++) {
+        const ordered = [
+            ...sortedRefs.slice(0, insertIndex),
+            moving,
+            ...sortedRefs.slice(insertIndex),
+        ];
+        const totalWidth = ordered.reduce((sum, r) => sum + r.width, 0);
+        const totalGapSpace = R - L - totalWidth;
+        if (totalGapSpace <= 0) continue;
+
+        const gap = totalGapSpace / (n + 1);
+        let x = L + gap;
+        for (let i = 0; i < insertIndex; i++) {
+            x += ordered[i].width + gap;
+        }
+        const idealLeft = x;
+        const delta = idealLeft - moving.left;
+        const snapped = withOffset(moving, delta, 0);
+        const snappedOrdered = ordered.map((r) =>
+            r === moving ? snapped : r,
+        );
+
+        candidates.push({
+            delta,
+            guides: buildDistributeXGuides(L, R, snappedOrdered, gap),
+        });
+    }
+
+    return candidates;
+}
+
+function collectDistributeCandidatesY(
+    moving: BoundingRect,
+    refs: BoundingRect[],
+    regions: MarginRegions,
+): SnapCandidate[] {
+    const candidates: SnapCandidate[] = [];
+    const T = regions.fullHeight.top;
+    const B = regions.fullHeight.bottom;
+
+    const bandRefs = refs.filter(
+        (ref) => overlapsX(moving, ref),
+    );
+
+    const sortedRefs = [...bandRefs].sort((a, b) => a.top - b.top);
+    const n = sortedRefs.length + 1;
+    if (n < 3) return candidates;
+
+    for (let insertIndex = 0; insertIndex < n; insertIndex++) {
+        const ordered = [
+            ...sortedRefs.slice(0, insertIndex),
+            moving,
+            ...sortedRefs.slice(insertIndex),
+        ];
+        const totalHeight = ordered.reduce((sum, r) => sum + r.height, 0);
+        const totalGapSpace = B - T - totalHeight;
+        if (totalGapSpace <= 0) continue;
+
+        const gap = totalGapSpace / (n + 1);
+        let y = T + gap;
+        for (let i = 0; i < insertIndex; i++) {
+            y += ordered[i].height + gap;
+        }
+        const idealTop = y;
+        const delta = idealTop - moving.top;
+        const snapped = withOffset(moving, 0, delta);
+        const snappedOrdered = ordered.map((r) =>
+            r === moving ? snapped : r,
+        );
+
+        candidates.push({
+            delta,
+            guides: buildDistributeYGuides(T, B, snappedOrdered, gap),
+        });
+    }
+
+    return candidates;
+}
+
 export function computeAlignmentSnap(
     movingObj: fabric.Object,
     referenceObjects: fabric.Object[],
     paperWidth: number,
     paperHeight: number,
     zoom: number,
+    regions: MarginRegions,
 ): AlignmentSnapResult {
     const threshold = ALIGNMENT_SNAP_THRESHOLD / Math.max(zoom, 0.01);
     const moving = getObjectBounds(movingObj);
@@ -327,12 +471,14 @@ export function computeAlignmentSnap(
     const currentTop = movingObj.top ?? 0;
 
     const xCandidates = [
-        ...collectEdgeAlignCandidatesX(moving, refs, paperWidth),
+        ...collectEdgeAlignCandidatesX(moving, refs, regions),
         ...collectEqualSpacingCandidatesX(moving, refs),
+        ...collectDistributeCandidatesX(moving, refs, regions),
     ];
     const yCandidates = [
-        ...collectEdgeAlignCandidatesY(moving, refs, paperHeight),
+        ...collectEdgeAlignCandidatesY(moving, refs, regions),
         ...collectEqualSpacingCandidatesY(moving, refs),
+        ...collectDistributeCandidatesY(moving, refs, regions),
     ];
 
     const bestX = pickBestCandidate(xCandidates, threshold);

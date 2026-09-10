@@ -1,18 +1,41 @@
 "use client";
 
-import React, { useEffect, useRef, useState, useCallback } from "react";
+import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { fabric } from "fabric";
-import { QuestionBlockConfig } from "@/types/editor";
+import {
+    DEFAULT_PAPER_MARGINS,
+    QuestionBlockConfig,
+    ExamHeaderConfig,
+    NameboxConfig,
+    ScoreTableConfig,
+} from "@/types/editor";
 import {
     PAPER_SIZES,
-    GRID_SNAP_SIZE,
+    GRID_MAJOR_CELL_COUNT,
+    getGridCellSizePx,
     SECTION_STANDARD_WIDTH,
 } from "@/lib/editor/paperSizes";
+
+const GRID_CELL_SIZE_PX = {
+    x: getGridCellSizePx("x"),
+    y: getGridCellSizePx("y"),
+};
 import {
     createQuestionBlock,
     CustomQuestionBlockGroup,
 } from "@/lib/editor/questionBlockBuilder";
+import {
+    createExamHeaderBlock,
+    createNameboxBlock,
+    createScoreTableBlock,
+    DEFAULT_EXAM_HEADER_CONFIG,
+    DEFAULT_NAMEBOX_CONFIG,
+    DEFAULT_SCORE_TABLE_CONFIG,
+    CustomExamHeaderGroup,
+    CustomNameboxGroup,
+    CustomScoreTableGroup,
+} from "@/lib/editor/basicPartBuilder";
 import { exportB4LandscapePdf, exportA4SplitPdf } from "@/lib/editor/exportPdf";
 import { exportB4WordDocx } from "@/lib/editor/exportWord";
 import {
@@ -21,10 +44,18 @@ import {
     isAlignmentGuide,
     renderAlignmentGuides,
 } from "@/lib/editor/alignmentGuides";
+import {
+    computeMarginGuideLines,
+    computeMarginRegions,
+} from "@/lib/editor/marginGuides";
 import { EditorToolbar } from "./EditorToolbar";
 import { QuestionEditModal } from "./modals/QuestionEditModal";
 import { ImportTextModal } from "./modals/ImportTextModal";
 import { BatchReplaceModal } from "./modals/BatchReplaceModal";
+import {
+    QuestionBlockPropertyPanel,
+    CustomFabricBlock,
+} from "./QuestionBlockPropertyPanel";
 
 export const AnswerSheetCanvasEditor: React.FC = () => {
     const fabricHostRef = useRef<HTMLDivElement | null>(null);
@@ -32,6 +63,10 @@ export const AnswerSheetCanvasEditor: React.FC = () => {
     const containerWrapRef = useRef<HTMLDivElement | null>(null);
     const snapEnabledRef = useRef(true);
     const alignmentGuidesEnabledRef = useRef(true);
+    const paperMarginsRef = useRef(DEFAULT_PAPER_MARGINS);
+    const selectedBlockRef = useRef<CustomFabricBlock | null>(null);
+    const isPropertyPanelOpenRef = useRef(false);
+    const suppressSelectionClearRef = useRef(false);
 
     // モーダル表示状態
     const [isQuestionModalOpen, setIsQuestionModalOpen] = useState(false);
@@ -40,11 +75,18 @@ export const AnswerSheetCanvasEditor: React.FC = () => {
     const [editingBlock, setEditingBlock] =
         useState<CustomQuestionBlockGroup | null>(null);
 
+    // 選択中のブロック（大問・基本パーツ）
+    const [selectedBlock, setSelectedBlock] =
+        useState<CustomFabricBlock | null>(null);
+    const [isPropertyPanelOpen, setIsPropertyPanelOpen] = useState(false);
+
     // グリッド・スナップ・ズーム
-    const [isGridVisible, setIsGridVisible] = useState(true);
+    const [isGridVisible, setIsGridVisible] = useState(false);
     const [isSnapEnabled, setIsSnapEnabled] = useState(true);
     const [isAlignmentGuidesEnabled, setIsAlignmentGuidesEnabled] =
         useState(true);
+    const [isMarginGuidesVisible, setIsMarginGuidesVisible] = useState(true);
+    const [paperMargins, setPaperMargins] = useState(DEFAULT_PAPER_MARGINS);
     const [zoomLevel, setZoomLevel] = useState(1.0);
     const [toastMessage, setToastMessage] = useState<string | null>(null);
     const [isExporting, setIsExporting] = useState(false);
@@ -56,6 +98,14 @@ export const AnswerSheetCanvasEditor: React.FC = () => {
             setToastMessage((current) => (current === msg ? null : current));
         }, 2500);
     }, []);
+
+    useEffect(() => {
+        paperMarginsRef.current = paperMargins;
+    }, [paperMargins]);
+
+    useEffect(() => {
+        isPropertyPanelOpenRef.current = isPropertyPanelOpen;
+    }, [isPropertyPanelOpen]);
 
     // 画面に合わせる（Fit to Screen）
     const fitCanvasToScreen = useCallback(() => {
@@ -103,114 +153,15 @@ export const AnswerSheetCanvasEditor: React.FC = () => {
     // サンプル初期配置
     const setupInitialSampleLayout = (canvas: fabric.Canvas) => {
         // 1. 考査見出し枠
-        const headerItems: fabric.Object[] = [];
-        headerItems.push(
-            new fabric.Rect({
-                left: 0,
-                top: 0,
-                width: SECTION_STANDARD_WIDTH,
-                height: 40,
-                fill: "transparent",
-                stroke: "#000000",
-                strokeWidth: 1,
-            }),
+        const headerGroup = createExamHeaderBlock(
+            DEFAULT_EXAM_HEADER_CONFIG,
+            40,
+            40,
         );
-        headerItems.push(
-            new fabric.Text(
-                "令和○年度　○学期考査　○年　○○○　解答用紙　令和○年　○月○日　(○)　○限目実施",
-                {
-                    left: 10,
-                    top: 12,
-                    fontFamily: "'Noto Serif JP', serif",
-                    fontSize: 13,
-                    fontWeight: "bold",
-                    fill: "#000000",
-                },
-            ),
-        );
-        const headerGroup = new fabric.Group(headerItems, {
-            left: 40,
-            top: 40,
-            selectable: true,
-            evented: true,
-        });
         canvas.add(headerGroup);
 
         // 2. 年組氏名枠
-        const nameItems: fabric.Object[] = [];
-        const nw = 300;
-        const nh = 40;
-        nameItems.push(
-            new fabric.Rect({
-                left: 0,
-                top: 0,
-                width: nw,
-                height: nh,
-                fill: "transparent",
-                stroke: "#000000",
-                strokeWidth: 1,
-            }),
-        );
-        nameItems.push(
-            new fabric.Line([40, 0, 40, nh], {
-                stroke: "#000000",
-                strokeWidth: 1,
-            }),
-        );
-        nameItems.push(
-            new fabric.Line([80, 0, 80, nh], {
-                stroke: "#000000",
-                strokeWidth: 1,
-            }),
-        );
-        nameItems.push(
-            new fabric.Line([120, 0, 120, nh], {
-                stroke: "#000000",
-                strokeWidth: 1,
-            }),
-        );
-        nameItems.push(
-            new fabric.Text("○年", {
-                left: 10,
-                top: 12,
-                fontFamily: "'Noto Serif JP', serif",
-                fontSize: 13,
-                fill: "#000000",
-            }),
-        );
-        nameItems.push(
-            new fabric.Text("組", {
-                left: 52,
-                top: 12,
-                fontFamily: "'Noto Serif JP', serif",
-                fontSize: 13,
-                fill: "#000000",
-            }),
-        );
-        nameItems.push(
-            new fabric.Text("番", {
-                left: 92,
-                top: 12,
-                fontFamily: "'Noto Serif JP', serif",
-                fontSize: 13,
-                fill: "#000000",
-            }),
-        );
-        nameItems.push(
-            new fabric.Text("氏名", {
-                left: 132,
-                top: 12,
-                fontFamily: "'Noto Serif JP', serif",
-                fontSize: 13,
-                fill: "#000000",
-            }),
-        );
-        const nameGroup = new fabric.Group(nameItems, {
-            left: 350,
-            top: 90,
-            selectable: true,
-            evented: true,
-        });
+        const nameGroup = createNameboxBlock(DEFAULT_NAMEBOX_CONFIG, 350, 90);
         canvas.add(nameGroup);
 
         // 3. 大問 1
@@ -236,6 +187,7 @@ export const AnswerSheetCanvasEditor: React.FC = () => {
                 circleCommaPaddingAuto: true,
                 splitRatio: "50:50",
                 splitHeight: 38,
+                blockWidth: SECTION_STANDARD_WIDTH,
             },
             40,
             160,
@@ -265,6 +217,7 @@ export const AnswerSheetCanvasEditor: React.FC = () => {
                 circleCommaPaddingAuto: true,
                 splitRatio: "50:50",
                 splitHeight: 38,
+                blockWidth: SECTION_STANDARD_WIDTH,
             },
             40,
             280,
@@ -294,6 +247,7 @@ export const AnswerSheetCanvasEditor: React.FC = () => {
                 circleCommaPaddingAuto: true,
                 splitRatio: "30:70",
                 splitHeight: 60,
+                blockWidth: SECTION_STANDARD_WIDTH,
             },
             720,
             40,
@@ -301,104 +255,11 @@ export const AnswerSheetCanvasEditor: React.FC = () => {
         canvas.add(q3);
 
         // 6. 得点欄 (右面下部)
-        const scoreItems: fabric.Object[] = [];
-        const sw = 240;
-        const sh = 60;
-        scoreItems.push(
-            new fabric.Rect({
-                left: 0,
-                top: 0,
-                width: sw,
-                height: sh,
-                fill: "transparent",
-                stroke: "#000000",
-                strokeWidth: 1,
-            }),
+        const scoreGroup = createScoreTableBlock(
+            DEFAULT_SCORE_TABLE_CONFIG,
+            1080,
+            860,
         );
-        scoreItems.push(
-            new fabric.Line([0, 30, sw, 30], {
-                stroke: "#000000",
-                strokeWidth: 1,
-            }),
-        );
-        scoreItems.push(
-            new fabric.Line([80, 0, 80, sh], {
-                stroke: "#000000",
-                strokeWidth: 1,
-            }),
-        );
-        scoreItems.push(
-            new fabric.Line([160, 0, 160, sh], {
-                stroke: "#000000",
-                strokeWidth: 1,
-            }),
-        );
-        scoreItems.push(
-            new fabric.Text("知・技", {
-                left: 40,
-                top: 8,
-                originX: "center",
-                fontFamily: "'Noto Sans JP', sans-serif",
-                fontSize: 12,
-                fill: "#000000",
-            }),
-        );
-        scoreItems.push(
-            new fabric.Text("思・判・表", {
-                left: 120,
-                top: 8,
-                originX: "center",
-                fontFamily: "'Noto Sans JP', sans-serif",
-                fontSize: 12,
-                fill: "#000000",
-            }),
-        );
-        scoreItems.push(
-            new fabric.Text("合計", {
-                left: 200,
-                top: 8,
-                originX: "center",
-                fontFamily: "'Noto Sans JP', sans-serif",
-                fontSize: 12,
-                fill: "#000000",
-            }),
-        );
-        scoreItems.push(
-            new fabric.Text("/50", {
-                left: 75,
-                top: 40,
-                originX: "right",
-                fontFamily: "'Noto Sans JP', sans-serif",
-                fontSize: 12,
-                fill: "#000000",
-            }),
-        );
-        scoreItems.push(
-            new fabric.Text("/50", {
-                left: 155,
-                top: 40,
-                originX: "right",
-                fontFamily: "'Noto Sans JP', sans-serif",
-                fontSize: 12,
-                fill: "#000000",
-            }),
-        );
-        scoreItems.push(
-            new fabric.Text("/100", {
-                left: 235,
-                top: 40,
-                originX: "right",
-                fontFamily: "'Noto Sans JP', sans-serif",
-                fontSize: 12,
-                fill: "#000000",
-            }),
-        );
-        const scoreGroup = new fabric.Group(scoreItems, {
-            left: 1080,
-            top: 860,
-            selectable: true,
-            evented: true,
-        });
         canvas.add(scoreGroup);
 
         canvas.getObjects().forEach((obj) => {
@@ -431,9 +292,6 @@ export const AnswerSheetCanvasEditor: React.FC = () => {
 
         fabricCanvasRef.current = canvas;
 
-        // 方眼グリッドは Fabric 外側のホスト div に表示
-        host.classList.add("grid-active");
-
         // オブジェクト移動時: 配置ガイド吸着 → 方眼スナップ
         canvas.on("object:moving", (e) => {
             if (!e.target) return;
@@ -455,12 +313,18 @@ export const AnswerSheetCanvasEditor: React.FC = () => {
                 const refs = canvas
                     .getObjects()
                     .filter((o) => o !== obj && !isAlignmentGuide(o));
+                const regions = computeMarginRegions(
+                    paperMarginsRef.current,
+                    b4.widthPx,
+                    b4.heightPx,
+                );
                 const result = computeAlignmentSnap(
                     obj,
                     refs,
                     b4.widthPx,
                     b4.heightPx,
                     canvas.getZoom(),
+                    regions,
                 );
                 left = result.left;
                 top = result.top;
@@ -474,10 +338,13 @@ export const AnswerSheetCanvasEditor: React.FC = () => {
             if (gridSnapOn) {
                 if (!snappedX) {
                     left =
-                        Math.round(left / GRID_SNAP_SIZE) * GRID_SNAP_SIZE;
+                        Math.round(left / GRID_CELL_SIZE_PX.x) *
+                        GRID_CELL_SIZE_PX.x;
                 }
                 if (!snappedY) {
-                    top = Math.round(top / GRID_SNAP_SIZE) * GRID_SNAP_SIZE;
+                    top =
+                        Math.round(top / GRID_CELL_SIZE_PX.y) *
+                        GRID_CELL_SIZE_PX.y;
                 }
             }
 
@@ -485,22 +352,39 @@ export const AnswerSheetCanvasEditor: React.FC = () => {
             obj.setCoords();
         });
 
-        const handleClearGuides = () => clearAlignmentGuides(canvas);
+        const updateSelectionState = () => {
+            const activeObj = canvas.getActiveObject() as CustomFabricBlock | null;
+            if (
+                activeObj &&
+                (activeObj.customType === "question-block" ||
+                    activeObj.customType === "exam-header" ||
+                    activeObj.customType === "namebox" ||
+                    activeObj.customType === "score-table")
+            ) {
+                setSelectedBlock(activeObj);
+                selectedBlockRef.current = activeObj;
+            } else {
+                setSelectedBlock(null);
+                selectedBlockRef.current = null;
+            }
+        };
+
+        const handleClearGuides = () => {
+            clearAlignmentGuides(canvas);
+        };
+
         canvas.on("mouse:up", handleClearGuides);
         canvas.on("object:modified", handleClearGuides);
-        canvas.on("selection:cleared", handleClearGuides);
-
-        // ダブルクリックで大問編集
-        canvas.on("mouse:dblclick", (e) => {
-            const target = e.target as CustomQuestionBlockGroup | undefined;
-            if (
-                target &&
-                target.customType === "question-block" &&
-                target.questionConfig
-            ) {
-                setEditingBlock(target);
-                setIsQuestionModalOpen(true);
-            }
+        canvas.on("selection:created", updateSelectionState);
+        canvas.on("selection:updated", updateSelectionState);
+        canvas.on("selection:cleared", () => {
+            handleClearGuides();
+            // プロパティ更新による置換、またはサイドバー操作時は閉じない
+            if (suppressSelectionClearRef.current) return;
+            if (isPropertyPanelOpenRef.current) return;
+            setSelectedBlock(null);
+            selectedBlockRef.current = null;
+            setIsPropertyPanelOpen(false);
         });
 
         // 初期サンプルの配置
@@ -550,15 +434,6 @@ export const AnswerSheetCanvasEditor: React.FC = () => {
     // 方眼グリッドトグル
     const handleToggleGrid = (visible: boolean) => {
         setIsGridVisible(visible);
-        const host = fabricHostRef.current;
-        if (!host) return;
-        if (visible) {
-            host.classList.add("grid-active");
-            host.classList.remove("bg-white");
-        } else {
-            host.classList.remove("grid-active");
-            host.classList.add("bg-white");
-        }
     };
 
     // キーボード削除ショートカット
@@ -614,8 +489,8 @@ export const AnswerSheetCanvasEditor: React.FC = () => {
             // 新規大問の配置
             const newBlock = createQuestionBlock(
                 cfg,
-                Math.round(50 / GRID_SNAP_SIZE) * GRID_SNAP_SIZE,
-                Math.round(100 / GRID_SNAP_SIZE) * GRID_SNAP_SIZE,
+                Math.round(50 / GRID_CELL_SIZE_PX.x) * GRID_CELL_SIZE_PX.x,
+                Math.round(100 / GRID_CELL_SIZE_PX.y) * GRID_CELL_SIZE_PX.y,
             );
             canvas.add(newBlock);
             canvas.setActiveObject(newBlock);
@@ -623,6 +498,81 @@ export const AnswerSheetCanvasEditor: React.FC = () => {
             showToast(`大問 ${cfg.num} を用紙に追加しました`);
         }
     };
+
+    // サイドパネルからのプロパティ更新（置換時に selection:cleared でパネルが閉じないよう抑制）
+    const replaceSelectedBlock = useCallback(
+        (createBlock: (left: number, top: number) => CustomFabricBlock) => {
+            const canvas = fabricCanvasRef.current;
+            const target = selectedBlockRef.current;
+            if (!canvas || !target) return;
+
+            const left = target.left ?? 40;
+            const top = target.top ?? 40;
+
+            suppressSelectionClearRef.current = true;
+            canvas.remove(target);
+            const newBlock = createBlock(left, top);
+            canvas.add(newBlock);
+            canvas.setActiveObject(newBlock);
+            canvas.requestRenderAll();
+            setSelectedBlock(newBlock);
+            selectedBlockRef.current = newBlock;
+            requestAnimationFrame(() => {
+                suppressSelectionClearRef.current = false;
+            });
+        },
+        [],
+    );
+
+    const handleUpdateSelectedQuestion = useCallback(
+        (cfg: QuestionBlockConfig) => {
+            replaceSelectedBlock((left, top) =>
+                createQuestionBlock(cfg, left, top),
+            );
+        },
+        [replaceSelectedBlock],
+    );
+
+    const handleUpdateSelectedExamHeader = useCallback(
+        (cfg: ExamHeaderConfig) => {
+            replaceSelectedBlock((left, top) =>
+                createExamHeaderBlock(cfg, left, top),
+            );
+        },
+        [replaceSelectedBlock],
+    );
+
+    const handleUpdateSelectedNamebox = useCallback(
+        (cfg: NameboxConfig) => {
+            replaceSelectedBlock((left, top) =>
+                createNameboxBlock(cfg, left, top),
+            );
+        },
+        [replaceSelectedBlock],
+    );
+
+    const handleUpdateSelectedScoreTable = useCallback(
+        (cfg: ScoreTableConfig) => {
+            replaceSelectedBlock((left, top) =>
+                createScoreTableBlock(cfg, left, top),
+            );
+        },
+        [replaceSelectedBlock],
+    );
+
+    // プロパティパネルを開く（選択中の枠を編集）
+    const handleTogglePropertyPanel = useCallback(() => {
+        if (!selectedBlockRef.current) {
+            showToast("編集する枠を選択してください");
+            return;
+        }
+        setIsPropertyPanelOpen((open) => !open);
+    }, [showToast]);
+
+    // プロパティパネルを閉じる（キャンバス上の選択は維持）
+    const handleClosePropertyPanel = useCallback(() => {
+        setIsPropertyPanelOpen(false);
+    }, []);
 
     // 観点記号一括置換の適用
     const handleApplyBatchReplace = (target: string, newText: string) => {
@@ -669,32 +619,7 @@ export const AnswerSheetCanvasEditor: React.FC = () => {
     const handleAddHeader = () => {
         const canvas = fabricCanvasRef.current;
         if (!canvas) return;
-        const items: fabric.Object[] = [];
-        items.push(
-            new fabric.Rect({
-                left: 0,
-                top: 0,
-                width: SECTION_STANDARD_WIDTH,
-                height: 40,
-                fill: "transparent",
-                stroke: "#000000",
-                strokeWidth: 1,
-            }),
-        );
-        items.push(
-            new fabric.Text(
-                "令和○年度　○学期考査　○年　○○○　解答用紙　令和○年　○月○日　(○)　○限目実施",
-                {
-                    left: 10,
-                    top: 12,
-                    fontFamily: "'Noto Serif JP', serif",
-                    fontSize: 13,
-                    fontWeight: "bold",
-                    fill: "#000000",
-                },
-            ),
-        );
-        const group = new fabric.Group(items, { left: 40, top: 40 });
+        const group = createExamHeaderBlock(DEFAULT_EXAM_HEADER_CONFIG, 40, 40);
         canvas.add(group);
         canvas.setActiveObject(group);
         canvas.requestRenderAll();
@@ -704,75 +629,7 @@ export const AnswerSheetCanvasEditor: React.FC = () => {
     const handleAddNamebox = () => {
         const canvas = fabricCanvasRef.current;
         if (!canvas) return;
-        const items: fabric.Object[] = [];
-        const w = 300;
-        const h = 40;
-        items.push(
-            new fabric.Rect({
-                left: 0,
-                top: 0,
-                width: w,
-                height: h,
-                fill: "transparent",
-                stroke: "#000000",
-                strokeWidth: 1,
-            }),
-        );
-        items.push(
-            new fabric.Line([40, 0, 40, h], {
-                stroke: "#000000",
-                strokeWidth: 1,
-            }),
-        );
-        items.push(
-            new fabric.Line([80, 0, 80, h], {
-                stroke: "#000000",
-                strokeWidth: 1,
-            }),
-        );
-        items.push(
-            new fabric.Line([120, 0, 120, h], {
-                stroke: "#000000",
-                strokeWidth: 1,
-            }),
-        );
-        items.push(
-            new fabric.Text("○年", {
-                left: 10,
-                top: 12,
-                fontFamily: "'Noto Serif JP', serif",
-                fontSize: 13,
-                fill: "#000000",
-            }),
-        );
-        items.push(
-            new fabric.Text("組", {
-                left: 52,
-                top: 12,
-                fontFamily: "'Noto Serif JP', serif",
-                fontSize: 13,
-                fill: "#000000",
-            }),
-        );
-        items.push(
-            new fabric.Text("番", {
-                left: 92,
-                top: 12,
-                fontFamily: "'Noto Serif JP', serif",
-                fontSize: 13,
-                fill: "#000000",
-            }),
-        );
-        items.push(
-            new fabric.Text("氏名", {
-                left: 132,
-                top: 12,
-                fontFamily: "'Noto Serif JP', serif",
-                fontSize: 13,
-                fill: "#000000",
-            }),
-        );
-        const group = new fabric.Group(items, { left: 350, top: 90 });
+        const group = createNameboxBlock(DEFAULT_NAMEBOX_CONFIG, 350, 90);
         canvas.add(group);
         canvas.setActiveObject(group);
         canvas.requestRenderAll();
@@ -782,99 +639,11 @@ export const AnswerSheetCanvasEditor: React.FC = () => {
     const handleAddScoretable = () => {
         const canvas = fabricCanvasRef.current;
         if (!canvas) return;
-        const items: fabric.Object[] = [];
-        const w = 240;
-        const h = 60;
-        items.push(
-            new fabric.Rect({
-                left: 0,
-                top: 0,
-                width: w,
-                height: h,
-                fill: "transparent",
-                stroke: "#000000",
-                strokeWidth: 1,
-            }),
+        const group = createScoreTableBlock(
+            DEFAULT_SCORE_TABLE_CONFIG,
+            1080,
+            860,
         );
-        items.push(
-            new fabric.Line([0, 30, w, 30], {
-                stroke: "#000000",
-                strokeWidth: 1,
-            }),
-        );
-        items.push(
-            new fabric.Line([80, 0, 80, h], {
-                stroke: "#000000",
-                strokeWidth: 1,
-            }),
-        );
-        items.push(
-            new fabric.Line([160, 0, 160, h], {
-                stroke: "#000000",
-                strokeWidth: 1,
-            }),
-        );
-        items.push(
-            new fabric.Text("知・技", {
-                left: 40,
-                top: 8,
-                originX: "center",
-                fontFamily: "'Noto Sans JP', sans-serif",
-                fontSize: 12,
-                fill: "#000000",
-            }),
-        );
-        items.push(
-            new fabric.Text("思・判・表", {
-                left: 120,
-                top: 8,
-                originX: "center",
-                fontFamily: "'Noto Sans JP', sans-serif",
-                fontSize: 12,
-                fill: "#000000",
-            }),
-        );
-        items.push(
-            new fabric.Text("合計", {
-                left: 200,
-                top: 8,
-                originX: "center",
-                fontFamily: "'Noto Sans JP', sans-serif",
-                fontSize: 12,
-                fill: "#000000",
-            }),
-        );
-        items.push(
-            new fabric.Text("/50", {
-                left: 75,
-                top: 40,
-                originX: "right",
-                fontFamily: "'Noto Sans JP', sans-serif",
-                fontSize: 12,
-                fill: "#000000",
-            }),
-        );
-        items.push(
-            new fabric.Text("/50", {
-                left: 155,
-                top: 40,
-                originX: "right",
-                fontFamily: "'Noto Sans JP', sans-serif",
-                fontSize: 12,
-                fill: "#000000",
-            }),
-        );
-        items.push(
-            new fabric.Text("/100", {
-                left: 235,
-                top: 40,
-                originX: "right",
-                fontFamily: "'Noto Sans JP', sans-serif",
-                fontSize: 12,
-                fill: "#000000",
-            }),
-        );
-        const group = new fabric.Group(items, { left: 1080, top: 860 });
         canvas.add(group);
         canvas.setActiveObject(group);
         canvas.requestRenderAll();
@@ -891,8 +660,8 @@ export const AnswerSheetCanvasEditor: React.FC = () => {
 
         activeObj.clone((cloned: CustomQuestionBlockGroup) => {
             cloned.set({
-                left: (activeObj.left || 0) + GRID_SNAP_SIZE,
-                top: (activeObj.top || 0) + GRID_SNAP_SIZE,
+                left: (activeObj.left || 0) + GRID_CELL_SIZE_PX.x,
+                top: (activeObj.top || 0) + GRID_CELL_SIZE_PX.y,
                 evented: true,
             });
             if (activeObj.customType) cloned.customType = activeObj.customType;
@@ -986,6 +755,29 @@ export const AnswerSheetCanvasEditor: React.FC = () => {
     };
 
     const b4Config = PAPER_SIZES.B4_LANDSCAPE;
+
+    const gridHostStyle = useMemo((): React.CSSProperties | undefined => {
+        if (!isGridVisible) return undefined;
+        const cellX = GRID_CELL_SIZE_PX.x * zoomLevel;
+        const cellY = GRID_CELL_SIZE_PX.y * zoomLevel;
+        const majorX = cellX * GRID_MAJOR_CELL_COUNT;
+        const majorY = cellY * GRID_MAJOR_CELL_COUNT;
+        return {
+            ["--grid-cell-x" as string]: `${cellX}px`,
+            ["--grid-cell-y" as string]: `${cellY}px`,
+            ["--grid-major-x" as string]: `${majorX}px`,
+            ["--grid-major-y" as string]: `${majorY}px`,
+        };
+    }, [isGridVisible, zoomLevel]);
+    const marginGuideLines = useMemo(
+        () =>
+            computeMarginGuideLines(
+                paperMargins,
+                b4Config.widthPx,
+                b4Config.heightPx,
+            ),
+        [paperMargins, b4Config.widthPx, b4Config.heightPx],
+    );
 
     return (
         <div className="h-screen bg-slate-100 text-slate-800 flex flex-col overflow-hidden font-sans">
@@ -1177,50 +969,98 @@ export const AnswerSheetCanvasEditor: React.FC = () => {
                 onAddScoretable={handleAddScoretable}
                 onClone={handleClone}
                 onDelete={handleDelete}
+                hasEditableSelection={selectedBlock !== null}
+                isPropertyPanelOpen={isPropertyPanelOpen}
+                onTogglePropertyPanel={handleTogglePropertyPanel}
                 isGridVisible={isGridVisible}
                 onToggleGrid={handleToggleGrid}
                 isSnapEnabled={isSnapEnabled}
                 onToggleSnap={handleToggleSnap}
                 isAlignmentGuidesEnabled={isAlignmentGuidesEnabled}
                 onToggleAlignmentGuides={handleToggleAlignmentGuides}
+                isMarginGuidesVisible={isMarginGuidesVisible}
+                onToggleMarginGuides={setIsMarginGuidesVisible}
+                paperMargins={paperMargins}
+                onPaperMarginsChange={setPaperMargins}
                 zoomLevel={zoomLevel}
                 onZoomIn={() => applyZoom(zoomLevel + 0.1)}
                 onZoomOut={() => applyZoom(zoomLevel - 0.1)}
                 onZoomFit={fitCanvasToScreen}
             />
 
-            {/* キャンバスワークスペース */}
-            <div
-                ref={containerWrapRef}
-                className="flex-1 overflow-auto bg-slate-200 p-6 flex items-start justify-center relative"
-                onClick={() => setIsPdfDropdownOpen(false)}
-            >
+            {/* メイン編集エリア（キャンバス + プロパティパネル） */}
+            <div className="flex-1 flex overflow-hidden relative">
+                {/* キャンバスワークスペース */}
                 <div
-                    className="relative inline-block transition-all"
-                    style={{
-                        width: `${b4Config.widthPx * zoomLevel}px`,
-                        height: `${b4Config.heightPx * zoomLevel}px`,
-                    }}
+                    ref={containerWrapRef}
+                    className="flex-1 overflow-auto bg-slate-200 p-6 flex items-start justify-center relative"
+                    onClick={() => setIsPdfDropdownOpen(false)}
                 >
-                    {/* Fabric.js Canvas */}
                     <div
-                        ref={fabricHostRef}
-                        className="fabric-canvas-host canvas-shadow rounded-none grid-active"
-                    />
+                        className="relative inline-block transition-all"
+                        style={{
+                            width: `${b4Config.widthPx * zoomLevel}px`,
+                            height: `${b4Config.heightPx * zoomLevel}px`,
+                        }}
+                    >
+                        {/* Fabric.js Canvas */}
+                        <div
+                            ref={fabricHostRef}
+                            className={`fabric-canvas-host canvas-shadow rounded-none ${isGridVisible ? "grid-active" : "bg-white"}`}
+                            style={gridHostStyle}
+                        />
 
-                    {/* 中央折り目 / A4分割ガイドライン */}
-                    <div
-                        className="absolute top-0 bottom-0 left-1/2 w-0 border-r-2 border-dashed border-indigo-400/70 pointer-events-none z-10"
-                        style={{ transform: "translateX(-1px)" }}
-                    />
-                    <div className="absolute top-2 left-1/2 -translate-x-1/2 pointer-events-none opacity-90 flex items-center gap-1.5 text-[11px] text-slate-600 bg-white/95 px-3 py-0.5 rounded-full border border-slate-300 shadow-xs z-10">
-                        <span>← 左面 (A4)</span>
-                        <span className="font-bold text-indigo-700">
-                            | B4中央折り目 |
-                        </span>
-                        <span>右面 (A4) →</span>
+                        {/* 中央折り目 / A4分割ガイドライン */}
+                        <div
+                            className="absolute top-0 bottom-0 left-1/2 w-0 border-r-2 border-dashed border-indigo-400/70 pointer-events-none z-10"
+                            style={{ transform: "translateX(-1px)" }}
+                        />
+
+                        {/* 余白ガイド（編集用・PDF非出力） */}
+                        {isMarginGuidesVisible && (
+                            <>
+                                {[
+                                    marginGuideLines.outerLeft,
+                                    marginGuideLines.foldLeft,
+                                    marginGuideLines.foldRight,
+                                    marginGuideLines.outerRight,
+                                ].map((left, index) => (
+                                    <div
+                                        key={`margin-v-${index}`}
+                                        className="absolute top-0 bottom-0 w-0 border-r border-dashed border-amber-400/70 pointer-events-none z-10"
+                                        style={{
+                                            left: `${(left / b4Config.widthPx) * 100}%`,
+                                        }}
+                                    />
+                                ))}
+                                <div
+                                    className="absolute left-0 right-0 h-0 border-t border-dashed border-amber-400/70 pointer-events-none z-10"
+                                    style={{
+                                        top: `${(marginGuideLines.top / b4Config.heightPx) * 100}%`,
+                                    }}
+                                />
+                                <div
+                                    className="absolute left-0 right-0 h-0 border-t border-dashed border-amber-400/70 pointer-events-none z-10"
+                                    style={{
+                                        top: `${(marginGuideLines.bottom / b4Config.heightPx) * 100}%`,
+                                    }}
+                                />
+                            </>
+                        )}
                     </div>
                 </div>
+
+                {/* プロパティ編集サイドパネル（任意で開く） */}
+                {isPropertyPanelOpen && selectedBlock && (
+                    <QuestionBlockPropertyPanel
+                        selectedBlock={selectedBlock}
+                        onUpdateQuestion={handleUpdateSelectedQuestion}
+                        onUpdateExamHeader={handleUpdateSelectedExamHeader}
+                        onUpdateNamebox={handleUpdateSelectedNamebox}
+                        onUpdateScoreTable={handleUpdateSelectedScoreTable}
+                        onClose={handleClosePropertyPanel}
+                    />
+                )}
             </div>
 
             {/* モーダル群 */}
