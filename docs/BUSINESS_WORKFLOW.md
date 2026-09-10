@@ -19,8 +19,8 @@ flowchart TB
         Home["/ app/page.tsx"]
         Editor["/editor app/editor/page.tsx"]
     end
-    Home --> CSVFlow[CSV Parse and PDF Generate]
-    Editor --> CanvasFlow[Fabric Canvas and Export]
+    Home --> CSVFlow[CSV Parse Preview Edit Sync]
+    Editor --> CanvasFlow[Fabric Canvas Edit Export]
     CSVFlow --> PDF1["PDF: 問題用紙 + 解答用紙"]
     CanvasFlow --> PDF2["PDF: B4横 or A4分割"]
     CanvasFlow --> DOCX["Word docx"]
@@ -34,7 +34,7 @@ flowchart TB
 
 | 機能 | ルート | 入口 UI | 入力 | 出力 |
 |------|--------|---------|------|------|
-| CSV ジェネレータ | `/` | CsvUploader | CSV ファイル | 問題+解答 PDF（@react-pdf） |
+| CSV ジェネレータ | `/` | CsvUploader | CSV ファイル | 問題+解答 PDF（@react-pdf）、編集後 CSV |
 | キャンバスエディタ | `/editor` | トップリンク | 手動配置・テキスト貼付 | B4 PDF / A4分割 PDF / docx |
 
 ---
@@ -47,7 +47,8 @@ sequenceDiagram
     participant Page as app/page.tsx
     participant Parser as csvParser
     participant Layout as examLayout
-    participant Preview as PreviewPanel
+    participant QPreview as QuestionPaperPreview
+    participant APreview as AnswerSheetPreview
     participant PDF as generateExamPdf
 
     User->>Page: CSV アップロード
@@ -56,17 +57,42 @@ sequenceDiagram
     Page->>Layout: createLayoutSettings + validate
     User->>Page: レイアウト確定
     Page->>Layout: createExamPreview
-    Layout-->>Preview: NumberedQuestion + displayNumbers
-    User->>Page: PDF ダウンロード
-    Page->>PDF: dynamic import react-pdf + pdf-lib
-    PDF-->>User: 結合 PDF Blob
+    Layout-->>QPreview: questions ベース
+    Layout-->>APreview: syncedQuestions ベース
+
+    opt 問題用紙編集
+        User->>QPreview: 問題文・選択肢を編集
+        QPreview->>Page: handleUpdateQuestion
+        Note over Page: hasUnsyncedChanges = true
+        User->>Page: 解答用紙に同期
+        Page->>Page: syncedQuestions <- questions
+    end
+
+    opt CSV再出力
+        User->>Page: CSVエクスポート
+        Page->>Parser: exportQuestionsToCsv
+    end
+
+    User->>Page: PDF ダウンロード target選択
+    Page->>PDF: generateExamPdf
+    PDF-->>User: PDF Blob
 ```
 
 **状態の要点**:
 
-- `questions` — CSV から得た生データ
-- `appliedSettings` — 確定済みレイアウト
-- `displayNumber` — 問題用紙・解答用紙・PDF で共有する通し番号
+| 状態 | 役割 |
+|------|------|
+| `questions` | 問題用紙プレビュー・PDF（問題用紙）のソース |
+| `syncedQuestions` | 解答用紙プレビュー・PDF（解答用紙）のソース |
+| `originalQuestions` | アップロード直後のスナップショット（リセット用） |
+| `appliedSettings` | 確定済みレイアウト |
+| `displayNumber` | 問題用紙・解答用紙・PDF で共有する通し番号（同期後） |
+
+**PDF出力対象** (`PdfDownloadTarget`):
+
+- `all` — 問題用紙 + 解答用紙
+- `question` — 問題用紙のみ（`questions` ベース）
+- `answer` — 解答用紙のみ（`syncedQuestions` ベース）
 
 ---
 
@@ -78,19 +104,29 @@ sequenceDiagram
     participant Editor as AnswerSheetCanvasEditor
     participant Fabric as fabric.Canvas
     participant Modal as QuestionEditModal
+    participant Panel as QuestionBlockPropertyPanel
     participant Builder as questionBlockBuilder
+    participant Basic as basicPartBuilder
     participant Export as exportPdf/exportWord
 
     User->>Editor: /editor アクセス
     Editor->>Fabric: ホスト div に canvas 初期化
-    Editor->>Fabric: サンプル大問・パーツ配置
+    Editor->>Fabric: サンプル大問・基本パーツ配置
 
-    alt 大問作成
+    alt 大問新規作成
         User->>Modal: 大問を作成・追加
         Modal->>Builder: drawModalPreviewCanvas
         User->>Modal: 設定確定
         Modal->>Builder: createQuestionBlock
         Builder->>Fabric: Group 追加
+    end
+
+    alt 大問・基本パーツ編集
+        User->>Fabric: 枠を選択
+        User->>Panel: プロパティを開く
+        Panel->>Editor: onUpdate config
+        Editor->>Builder: replaceSelectedBlock
+        Builder->>Fabric: Group 置換
     end
 
     alt 問題文インポート
@@ -101,7 +137,7 @@ sequenceDiagram
     end
 
     User->>Editor: ドラッグ配置
-    Editor->>Editor: alignmentGuides 吸着
+    Editor->>Editor: alignmentGuides + marginRegions 吸着
 
     User->>Editor: PDF/Word 保存
     Editor->>Export: getCleanCanvasDataUrl
@@ -111,7 +147,15 @@ sequenceDiagram
 **状態の要点**:
 
 - Fabric canvas 上のオブジェクトが唯一のソースオブジェクト
-- 大問のみ `questionConfig`（JSON）を Group に保持
+- 各 Group が `customType` と対応する config を保持:
+
+| customType | config フィールド |
+|------------|------------------|
+| `question-block` | `questionConfig` |
+| `exam-header` | `examHeaderConfig` |
+| `namebox` | `nameboxConfig` |
+| `score-table` | `scoreTableConfig` |
+
 - 永続化レイヤーなし（リロードで消失）
 
 ---
@@ -136,32 +180,55 @@ flowchart LR
 | `circle_comma` | `buildCircleCommaLayout` | 外枠1 + 縦横内部線 + 丸数字/カンマ |
 | `split_2` | 比率計算 | 左右2 Rect |
 
+`blockWidth` は `clampQuestionBlockWidth()` で 200–1200px に制限。未指定時 `SECTION_STANDARD_WIDTH`（630px）。
+
 ---
 
-## 6. プレビュー同期フロー
-
-モーダルと canvas で **同一の layout 関数** を共有する設計。
+## 6. プレビュー・編集の3経路
 
 ```
 QuestionBlockConfig
-    ├─→ drawModalPreviewCanvas (width=580)  … モーダル内プレビュー
-    └─→ createQuestionBlock (width=630)     … Fabric canvas 上の Group
+    ├─→ drawModalPreviewCanvas (width=580)  … 新規作成モーダルのプレビュー
+    ├─→ createQuestionBlock (width=blockWidth) … Fabric canvas 上の Group
+    └─→ QuestionBlockPropertyPanel … 既存ブロックの直接編集（プレビューなし、canvas 再生成）
 ```
 
 **開発時ルール**（`.cursor/rules/answer-paper-editor-workflow.mdc`）:
 
-- 描画変更は両関数を必ずペア更新
-- 型変更は `types/editor.ts` + モーダル + デフォルト config まで一式
+- 描画変更は `createQuestionBlock` と `drawModalPreviewCanvas` を必ずペア更新
+- 型変更は `types/editor.ts` + モーダル + プロパティパネル + デフォルト config まで一式
 
 ---
 
-## 7. エクスポートフロー
+## 7. 余白ガイドと配置ガイドの連携
+
+```mermaid
+flowchart TD
+    Margins[PaperMargins] --> Compute[computeMarginGuideLines]
+    Compute --> Overlay[HTML amber オーバーレイ]
+    Margins --> Regions[computeMarginRegions]
+    Regions --> Align[alignmentGuides 吸着領域]
+    Drag[オブジェクトドラッグ] --> Align
+    Align --> Snap[rose 破線 + スナップ]
+    Export[PDF/Word 出力] --> Strip[配置ガイド除去 + 方眼OFF]
+    Note1[余白ガイドはHTMLのため出力対象外]
+```
+
+- 余白ガイド: `marginGuides.ts` — 編集補助のみ、PDF/Word 非含有
+- 配置ガイド: `alignmentGuides.ts` — Fabric 上の rose 破線、エクスポート時 `stripAlignmentGuidesForExport()` で除去
+- 方眼: `globals.css` — エクスポート時 `grid-active` クラスを一時除去
+
+---
+
+## 8. エクスポートフロー
 
 ```mermaid
 flowchart TD
     Canvas[fabric.Canvas] --> Clean[getCleanCanvasDataUrl]
-    Clean --> Strip[ガイド除去 + 方眼OFF + zoom=1]
-    Strip --> PNG[PNG multiplier=2]
+    Clean --> StripGuides[配置ガイド除去]
+    Clean --> StripGrid[方眼OFF]
+    Clean --> ZoomReset[zoom=1 白背景]
+    ZoomReset --> PNG[PNG multiplier=2]
     PNG --> Branch{出力形式}
     Branch -->|B4横| PDF1[pdf-lib 1page B4]
     Branch -->|A4分割| PDF2[pdf-lib left+right 2pages]
@@ -175,20 +242,26 @@ A4分割: B4横 canvas（1376px）の左半（688px）→ A4 p1、右半 → A4 
 
 ---
 
-## 8. 機能選択ガイド（開発視点）
+## 9. 機能選択ガイド（開発視点）
 
 | 変更内容 | 触る機能 | 主なファイル |
 |----------|----------|-------------|
 | CSV 形式・問題タイプ追加 | Part A | `types/question.ts`, `csvParser.ts`, `pdfDocuments.tsx` |
 | 4択/単語/記述の解答欄レイアウト | Part A | `AnswerSheetPreview.tsx`, `pdfDocuments.tsx` |
+| 問題用紙プレビュー編集 | Part A | `QuestionPaperPreview.tsx`, `app/page.tsx` |
+| 解答用紙同期・CSV再出力 | Part A | `app/page.tsx`, `PreviewPanel.tsx` |
+| PDF 出力対象選択 | Part A | `generateExamPdf.ts`, `PreviewPanel.tsx` |
 | 定期考査解答用紙の枠・パターン | Part B | `questionBlockBuilder.ts`, `QuestionEditModal.tsx` |
-| ドラッグ UX・吸着 | Part B | `alignmentGuides.ts`, `AnswerSheetCanvasEditor.tsx` |
+| 既存ブロックのプロパティ編集 | Part B | `QuestionBlockPropertyPanel.tsx`, `AnswerSheetCanvasEditor.tsx` |
+| 基本パーツ生成・編集 | Part B | `basicPartBuilder.ts`, `QuestionBlockPropertyPanel.tsx` |
+| ドラッグ UX・吸着 | Part B | `alignmentGuides.ts`, `marginGuides.ts`, `AnswerSheetCanvasEditor.tsx` |
+| 余白ガイド表示・調整 | Part B | `marginGuides.ts`, `EditorToolbar.tsx`, `types/editor.ts` |
 | 出力形式追加 | Part B | `exportPdf.ts`, `exportWord.ts` |
 | 両機能のデータ連携 | 新規設計 | 未実装 — 接点設計が必要 |
 
 ---
 
-## 9. 将来拡張の接点（未実装）
+## 10. 将来拡張の接点（未実装）
 
 以下は現コードベースに存在しない。設計検討用のメモ。
 
@@ -201,19 +274,25 @@ A4分割: B4横 canvas（1376px）の左半（688px）→ A4 p1、右半 → A4 
 
 ---
 
-## 10. 変更時チェックリスト
+## 11. 変更時チェックリスト
 
 ### Part A を変更した場合
 
 - [ ] CSV サンプルでパースが通る
-- [ ] 問題用紙・解答用紙の displayNumber 一致
+- [ ] 問題用紙プレビューで編集 → 同期 → 解答用紙に反映される
+- [ ] 問題用紙・解答用紙の displayNumber 一致（同期後）
+- [ ] PDF 対象選択（全部 / 問題のみ / 解答のみ）が正常
+- [ ] CSV エクスポートで編集内容が出力される
 - [ ] PDF 結合ダウンロード成功
 
 ### Part B を変更した場合
 
 - [ ] `createQuestionBlock` と `drawModalPreviewCanvas` を両方更新
-- [ ] `QuestionEditModal` の state / getCurrentConfig 更新
+- [ ] `QuestionEditModal` / `QuestionBlockPropertyPanel` の state / config 更新
 - [ ] デフォルト config（`AnswerSheetCanvasEditor`, `ImportTextModal`）更新
-- [ ] モーダルプレビューと canvas の見た目一致
+- [ ] 新規作成モーダルのプレビューと canvas の見た目一致
+- [ ] プロパティパネルで大問・基本パーツ編集が動作する
+- [ ] 余白ガイド ON/OFF・スライダー変更が表示に反映される
 - [ ] B4 PDF / A4分割 PDF / Word 出力成功
+- [ ] 配置ガイド・余白ガイドが PDF/Word に含まれない
 - [ ] `npm run build` 成功
