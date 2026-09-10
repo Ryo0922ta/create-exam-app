@@ -1,0 +1,51 @@
+---
+description: 解答用紙エディタの Fabric 描画とモーダルプレビュー同期の実装手順
+globs: lib/editor/questionBlockBuilder.ts,components/editor/**/*.tsx,types/editor.ts
+alwaysApply: false
+---
+
+# Answer Paper Editor — 実装ワークフロー（HOW）
+
+関連ルール: `answer-paper-circle-comma.mdc`（丸数字の描画仕様）
+
+## Fabric Canvas
+
+- Fabric の `<canvas>` は React が直接管理しない。ホスト `div` に Fabric をマウントする方式を維持する
+- 方眼は canvas ではなくホスト側（`globals.css`）で描画する
+
+## 描画ロジックの二重実装
+
+大問ブロックの見た目を変えるときは **必ず両方** を同じルールで更新する:
+
+| 用途 | 関数 | ファイル |
+|------|------|----------|
+| 用紙 canvas（Fabric） | `createQuestionBlock` | `lib/editor/questionBlockBuilder.ts` |
+| モーダルプレビュー | `drawModalPreviewCanvas` | 同上 |
+
+プレビューだけ・canvas だけの片方更新は禁止。
+
+## QuestionBlockConfig 変更時の checklist
+
+1. `types/editor.ts` — 型定義
+2. `lib/editor/questionBlockBuilder.ts` — layout + Fabric + プレビュー
+3. `components/editor/modals/QuestionEditModal.tsx` — state / UI / `getCurrentConfig`
+4. デフォルト config — `AnswerSheetCanvasEditor.tsx`, `ImportTextModal.tsx`
+5. `npm run build` で型エラーがないことを確認
+
+## レイアウト系パターンの UI 一貫性
+
+`grid` / `sub_parens` / `circle_comma` は UI を揃える:
+
+- **行数** / **列数** / **1行の高さ** の3項目
+- 位置の微調整 UI は **px より比率（%）** を優先（プレビュー幅と canvas 幅の差に強い）
+
+## 後方互換
+
+- 既存フィールドは型上残し、新フィールドを正とする
+- 読み込み時にフォールバック（例: `circleCols ?? circleCount`）
+- 保存時に派生値を併記（例: `circleCount = rows × cols`）
+
+## 検証
+
+- モーダルプレビュー（580px）と用紙 canvas（`SECTION_STANDARD_WIDTH` = 610px）で見た目が一致すること
+- 既存保存データ（新フィールドなし）がエラーなく開けること
