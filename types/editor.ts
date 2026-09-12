@@ -4,7 +4,51 @@ export type QuestionPattern =
     | "sub_parens"
     | "grid"
     | "circle_comma"
-    | "split_2";
+    | "split_2"
+    | "grouped";
+
+export type SubQuestionCellType = "box" | "essay" | "grid";
+export type SubQuestionPattern =
+    | "sub_parens"
+    | "grid"
+    | "circle_comma"
+    | "split_2"
+    | "essay";
+
+export interface SubQuestionCell {
+    label: string;
+    widthRatio: number;
+    type: SubQuestionCellType;
+}
+
+export interface SubQuestionRowConfig {
+    labels: string[];
+}
+
+export interface SubQuestionGroup {
+    label: string;
+    height: number;
+    unclassifiedLabels?: string[];
+    pattern?: SubQuestionPattern;
+    subRows?: number;
+    subCols?: number;
+    subRowHeight?: number;
+    subLabels?: string[];
+    /** 小問複合枠の行ごとのラベル。行ごとに列数を変えられる新形式 */
+    subRowConfigs?: SubQuestionRowConfig[];
+    gridRows?: number;
+    gridCols?: number;
+    gridRowHeight?: number;
+    circleRows?: number;
+    circleCols?: number;
+    circleHeight?: number;
+    circleCommaEnabled?: boolean;
+    circleCommaPaddingAuto?: boolean;
+    circleCommaPaddingRatio?: number;
+    splitRatio?: "50:50" | "30:70" | "70:30" | string;
+    /** 旧 grouped 形式。読み込み時に sub_parens へ変換する */
+    cells?: SubQuestionCell[];
+}
 
 export interface QuestionBlockConfig {
     num: string;
@@ -30,6 +74,8 @@ export interface QuestionBlockConfig {
     circleCommaPaddingRatio?: number;
     splitRatio: "50:50" | "30:70" | "70:30" | string;
     splitHeight: number;
+    /** 小問ごとに高さ・分割数を変える grouped 用 */
+    groups?: SubQuestionGroup[];
     /** 大問ブロック全体の横幅（px）。未指定時は SECTION_STANDARD_WIDTH */
     blockWidth?: number;
 }

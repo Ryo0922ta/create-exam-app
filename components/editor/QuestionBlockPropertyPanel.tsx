@@ -4,6 +4,9 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
     QuestionBlockConfig,
     QuestionPattern,
+    SubQuestionCell,
+    SubQuestionGroup,
+    SubQuestionPattern,
     ExamHeaderConfig,
     NameboxConfig,
     ScoreTableConfig,
@@ -464,7 +467,9 @@ const NameboxForm: React.FC<NameboxFormProps> = ({
                                 onChange={(e) =>
                                     updateLabelIndex(0, e.target.value)
                                 }
-                                onBlur={() => triggerImmediateUpdate({ labels })}
+                                onBlur={() =>
+                                    triggerImmediateUpdate({ labels })
+                                }
                                 className="w-full px-2 py-1 border border-slate-300 rounded focus:ring-1 focus:ring-indigo-500"
                             />
                         </div>
@@ -479,7 +484,9 @@ const NameboxForm: React.FC<NameboxFormProps> = ({
                                 onChange={(e) =>
                                     updateLabelIndex(1, e.target.value)
                                 }
-                                onBlur={() => triggerImmediateUpdate({ labels })}
+                                onBlur={() =>
+                                    triggerImmediateUpdate({ labels })
+                                }
                                 className="w-full px-2 py-1 border border-slate-300 rounded focus:ring-1 focus:ring-indigo-500"
                             />
                         </div>
@@ -494,7 +501,9 @@ const NameboxForm: React.FC<NameboxFormProps> = ({
                                 onChange={(e) =>
                                     updateLabelIndex(2, e.target.value)
                                 }
-                                onBlur={() => triggerImmediateUpdate({ labels })}
+                                onBlur={() =>
+                                    triggerImmediateUpdate({ labels })
+                                }
                                 className="w-full px-2 py-1 border border-slate-300 rounded focus:ring-1 focus:ring-indigo-500"
                             />
                         </div>
@@ -509,7 +518,9 @@ const NameboxForm: React.FC<NameboxFormProps> = ({
                                 onChange={(e) =>
                                     updateLabelIndex(3, e.target.value)
                                 }
-                                onBlur={() => triggerImmediateUpdate({ labels })}
+                                onBlur={() =>
+                                    triggerImmediateUpdate({ labels })
+                                }
                                 className="w-full px-2 py-1 border border-slate-300 rounded focus:ring-1 focus:ring-indigo-500"
                             />
                         </div>
@@ -891,6 +902,35 @@ const QuestionBlockForm: React.FC<QuestionBlockFormProps> = ({
     // 2分割
     const [splitRatio, setSplitRatio] = useState("50:50");
     const [splitHeight, setSplitHeight] = useState(38);
+    const [groups, setGroups] = useState<SubQuestionGroup[]>([
+        {
+            label: "1",
+            height: 42,
+            pattern: "grid",
+            gridRows: 1,
+            gridCols: 1,
+            cells: [{ label: "", widthRatio: 1, type: "box" }],
+        },
+        {
+            label: "2",
+            height: 42,
+            pattern: "sub_parens",
+            subRows: 1,
+            subCols: 3,
+            subLabels: ["(a)", "(b)", "(c)"],
+            cells: [
+                { label: "(a)", widthRatio: 1, type: "box" },
+                { label: "(b)", widthRatio: 1, type: "box" },
+                { label: "(c)", widthRatio: 1, type: "box" },
+            ],
+        },
+        {
+            label: "3",
+            height: 42,
+            pattern: "essay",
+            cells: [{ label: "", widthRatio: 1, type: "essay" }],
+        },
+    ]);
     const [blockWidth, setBlockWidth] = useState(SECTION_STANDARD_WIDTH);
     const blockWidthMm = Math.round(
         (Number(blockWidth) / PAPER_SIZES.B4_LANDSCAPE.widthPx) *
@@ -920,9 +960,7 @@ const QuestionBlockForm: React.FC<QuestionBlockFormProps> = ({
         setGridRowHeight(config.gridRowHeight || 32);
 
         setCircleRows(config.circleRows ?? 1);
-        setCircleCols(
-            config.circleCols ?? config.circleCount ?? 5,
-        );
+        setCircleCols(config.circleCols ?? config.circleCount ?? 5);
         setCircleHeight(config.circleHeight || 32);
         setCircleCommaEnabled(config.circleCommaEnabled ?? false);
         setCircleCommaPaddingAuto(config.circleCommaPaddingAuto ?? true);
@@ -935,6 +973,55 @@ const QuestionBlockForm: React.FC<QuestionBlockFormProps> = ({
 
         setSplitRatio(config.splitRatio || "50:50");
         setSplitHeight(config.splitHeight || 38);
+        setGroups(
+            config.groups?.length
+                ? config.groups.map((group, index) => {
+                      const copy = JSON.parse(JSON.stringify(group));
+                      if (copy.pattern) return copy;
+                      const cells = copy.cells?.length
+                          ? copy.cells
+                          : [{ label: "", widthRatio: 1, type: "box" }];
+                      return {
+                          ...copy,
+                          label: copy.label || String(index + 1),
+                          pattern: "sub_parens",
+                          subRows: 1,
+                          subCols: cells.length,
+                          subLabels: cells.map(
+                              (cell: SubQuestionCell) => cell.label,
+                          ),
+                      };
+                  })
+                : [
+                      {
+                          label: "1",
+                          height: 42,
+                          pattern: "grid",
+                          gridRows: 1,
+                          gridCols: 1,
+                          cells: [{ label: "", widthRatio: 1, type: "box" }],
+                      },
+                      {
+                          label: "2",
+                          height: 42,
+                          pattern: "sub_parens",
+                          subRows: 1,
+                          subCols: 3,
+                          subLabels: ["(a)", "(b)", "(c)"],
+                          cells: [
+                              { label: "(a)", widthRatio: 1, type: "box" },
+                              { label: "(b)", widthRatio: 1, type: "box" },
+                              { label: "(c)", widthRatio: 1, type: "box" },
+                          ],
+                      },
+                      {
+                          label: "3",
+                          height: 42,
+                          pattern: "essay",
+                          cells: [{ label: "", widthRatio: 1, type: "essay" }],
+                      },
+                  ],
+        );
 
         isInitialMountRef.current = true;
     }, [block]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -960,16 +1047,22 @@ const QuestionBlockForm: React.FC<QuestionBlockFormProps> = ({
 
             return {
                 num:
-                    (overrides.num !== undefined ? overrides.num : num).trim() ||
-                    "1",
-                rubric: (
-                    overrides.rubric !== undefined ? overrides.rubric : rubric
+                    (overrides.num !== undefined
+                        ? overrides.num
+                        : num
+                    ).trim() || "1",
+                rubric: (overrides.rubric !== undefined
+                    ? overrides.rubric
+                    : rubric
                 ).trim(),
-                points: (
-                    overrides.points !== undefined ? overrides.points : points
+                points: (overrides.points !== undefined
+                    ? overrides.points
+                    : points
                 ).trim(),
                 pattern:
-                    overrides.pattern !== undefined ? overrides.pattern : pattern,
+                    overrides.pattern !== undefined
+                        ? overrides.pattern
+                        : pattern,
                 subRows:
                     overrides.subRows !== undefined
                         ? overrides.subRows
@@ -1026,6 +1119,54 @@ const QuestionBlockForm: React.FC<QuestionBlockFormProps> = ({
                     overrides.splitHeight !== undefined
                         ? overrides.splitHeight
                         : Number(splitHeight) || 38,
+                groups:
+                    overrides.groups !== undefined
+                        ? overrides.groups
+                        : groups.map((group) => ({
+                              label: group.label.trim(),
+                              height: Math.max(24, Number(group.height) || 42),
+                              cells: (group.cells || []).map((cell) => ({
+                                  label: cell.label.trim(),
+                                  widthRatio: Math.max(
+                                      0.01,
+                                      Number(cell.widthRatio) || 1,
+                                  ),
+                                  type: cell.type,
+                              })),
+                              pattern: group.pattern || "sub_parens",
+                              subRows: Math.max(1, Number(group.subRows) || 1),
+                              subCols: Math.max(1, Number(group.subCols) || 1),
+                              subLabels: group.subLabels || [],
+                              subRowConfigs: group.subRowConfigs?.map((row) => ({
+                                  labels: row.labels.map((label) => label.trim()),
+                              })),
+                              gridRows: Math.max(
+                                  1,
+                                  Number(group.gridRows) || 1,
+                              ),
+                              gridCols: Math.max(
+                                  1,
+                                  Number(group.gridCols) || 1,
+                              ),
+                              circleRows: Math.max(
+                                  1,
+                                  Number(group.circleRows) || 1,
+                              ),
+                              circleCols: Math.max(
+                                  1,
+                                  Number(group.circleCols) || 1,
+                              ),
+                              circleCommaEnabled:
+                                  group.circleCommaEnabled ?? false,
+                              circleCommaPaddingAuto:
+                                  group.circleCommaPaddingAuto ?? true,
+                              circleCommaPaddingRatio:
+                                  group.circleCommaPaddingRatio ??
+                                  getDefaultCircleCommaPaddingRatio(
+                                      group.circleCols || 1,
+                                  ),
+                              splitRatio: group.splitRatio || "50:50",
+                          })),
                 blockWidth: clampQuestionBlockWidth(
                     overrides.blockWidth !== undefined
                         ? overrides.blockWidth
@@ -1053,9 +1194,106 @@ const QuestionBlockForm: React.FC<QuestionBlockFormProps> = ({
             circleCommaPaddingRatio,
             splitRatio,
             splitHeight,
+            groups,
             blockWidth,
         ],
     );
+
+    const updateGroup = (
+        groupIndex: number,
+        updates: Partial<SubQuestionGroup>,
+    ) => {
+        const next = groups.map((group, index) =>
+            index === groupIndex ? { ...group, ...updates } : group,
+        );
+        setGroups(next);
+        triggerImmediateUpdate({ groups: next });
+    };
+
+    const getSubParensRows = (group: SubQuestionGroup): string[][] => {
+        if (group.subRowConfigs?.length) {
+            return group.subRowConfigs.map((row) => [...row.labels]);
+        }
+        const rows = Math.max(1, Number(group.subRows) || 1);
+        const cols = Math.max(1, Number(group.subCols) || 1);
+        return Array.from({ length: rows }, (_, rowIndex) =>
+            Array.from(
+                { length: cols },
+                (_, colIndex) =>
+                    group.subLabels?.[rowIndex * cols + colIndex] || "",
+            ),
+        );
+    };
+
+    const updateSubParensRows = (
+        groupIndex: number,
+        rows: string[][],
+    ) => {
+        updateGroup(groupIndex, {
+            subRowConfigs: rows.map((labels) => ({ labels })),
+            subRows: rows.length,
+            subCols: Math.max(1, ...rows.map((labels) => labels.length)),
+            subLabels: rows.flat(),
+        });
+    };
+
+    const updateSubParensCell = (
+        groupIndex: number,
+        rowIndex: number,
+        colIndex: number,
+        value: string,
+    ) => {
+        const rows = getSubParensRows(groups[groupIndex]);
+        const nextRows = rows.map((row, index) => {
+            if (index !== rowIndex) return row;
+            const nextRow = [...row];
+            nextRow[colIndex] = value;
+            return nextRow;
+        });
+        updateSubParensRows(groupIndex, nextRows);
+    };
+
+    const addSubParensColumn = (groupIndex: number, rowIndex: number) => {
+        const rows = getSubParensRows(groups[groupIndex]);
+        const nextRows = rows.map((row, index) =>
+            index === rowIndex ? [...row, ""] : row,
+        );
+        updateSubParensRows(groupIndex, nextRows);
+    };
+
+    const removeSubParensColumn = (
+        groupIndex: number,
+        rowIndex: number,
+        colIndex: number,
+    ) => {
+        const rows = getSubParensRows(groups[groupIndex]);
+        const nextRows = rows.map((row, index) => {
+            if (index !== rowIndex) return row;
+            if (row.length <= 1) return row;
+            return row.filter((_, columnIndex) => columnIndex !== colIndex);
+        });
+        updateSubParensRows(groupIndex, nextRows);
+    };
+
+    const addGroup = () => {
+        const next = [
+            ...groups,
+            {
+                label: String(groups.length + 1),
+                height: 42,
+                pattern: "essay" as const,
+            },
+        ];
+        setGroups(next);
+        triggerImmediateUpdate({ groups: next });
+    };
+
+    const removeGroup = (groupIndex: number) => {
+        if (groups.length <= 1) return;
+        const next = groups.filter((_, index) => index !== groupIndex);
+        setGroups(next);
+        triggerImmediateUpdate({ groups: next });
+    };
 
     // スライダー等の即時更新ハンドラ
     const triggerImmediateUpdate = useCallback(
@@ -1282,6 +1520,9 @@ const QuestionBlockForm: React.FC<QuestionBlockFormProps> = ({
                             </option>
                             <option value="split_2">
                                 左右2分割（記号＋記述など）
+                            </option>
+                            <option value="grouped">
+                                小問グループ（行ごとに設定）
                             </option>
                         </select>
                     </div>
@@ -1522,7 +1763,9 @@ const QuestionBlockForm: React.FC<QuestionBlockFormProps> = ({
                                         );
                                         setCircleCols(v);
                                         const ratio = circleCommaPaddingAuto
-                                            ? getDefaultCircleCommaPaddingRatio(v)
+                                            ? getDefaultCircleCommaPaddingRatio(
+                                                  v,
+                                              )
                                             : circleCommaPaddingRatio;
                                         setCircleCommaPaddingRatio(ratio);
                                         triggerImmediateUpdate({
@@ -1586,13 +1829,17 @@ const QuestionBlockForm: React.FC<QuestionBlockFormProps> = ({
                                             checked={circleCommaPaddingAuto}
                                             onChange={(e) => {
                                                 const isAuto = e.target.checked;
-                                                setCircleCommaPaddingAuto(isAuto);
+                                                setCircleCommaPaddingAuto(
+                                                    isAuto,
+                                                );
                                                 const ratio = isAuto
                                                     ? getDefaultCircleCommaPaddingRatio(
                                                           circleCols,
                                                       )
                                                     : circleCommaPaddingRatio;
-                                                setCircleCommaPaddingRatio(ratio);
+                                                setCircleCommaPaddingRatio(
+                                                    ratio,
+                                                );
                                                 triggerImmediateUpdate({
                                                     circleCommaPaddingAuto:
                                                         isAuto,
@@ -1698,6 +1945,391 @@ const QuestionBlockForm: React.FC<QuestionBlockFormProps> = ({
                                 className="w-full accent-indigo-600"
                             />
                         </div>
+                    </div>
+                )}
+
+                {pattern === "grouped" && (
+                    <div className="space-y-3 bg-slate-50 p-3 rounded-lg border border-slate-200">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <div className="font-semibold text-slate-700 text-[11px]">
+                                    小問グループの設定
+                                </div>
+                                <p className="text-[10px] text-slate-400 mt-0.5">
+                                    行ごとに解答欄を編集
+                                </p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={addGroup}
+                                className="px-2 py-1 text-[10px] text-indigo-700 border border-indigo-200 rounded bg-white hover:bg-indigo-50"
+                            >
+                                ＋小問
+                            </button>
+                        </div>
+                        {groups.map((group, groupIndex) => (
+                            <div
+                                key={`property-group-${groupIndex}`}
+                                className="rounded border border-slate-200 bg-white p-2 space-y-2"
+                            >
+                                <div className="flex items-center gap-1.5">
+                                    <input
+                                        type="text"
+                                        aria-label={`小問${groupIndex + 1}番号`}
+                                        value={group.label}
+                                        onChange={(e) =>
+                                            updateGroup(groupIndex, {
+                                                label: e.target.value,
+                                            })
+                                        }
+                                        className="w-12 px-1.5 py-1 border border-slate-300 rounded text-center"
+                                    />
+                                    <input
+                                        type="number"
+                                        aria-label={`小問${groupIndex + 1}高さ`}
+                                        min={24}
+                                        max={240}
+                                        value={group.height}
+                                        onChange={(e) =>
+                                            updateGroup(groupIndex, {
+                                                height:
+                                                    Number(e.target.value) ||
+                                                    24,
+                                            })
+                                        }
+                                        className="w-14 px-1.5 py-1 border border-slate-300 rounded text-center"
+                                    />
+                                    <span className="text-[10px] text-slate-500">
+                                        px
+                                    </span>
+                                    <button
+                                        type="button"
+                                        onClick={() => removeGroup(groupIndex)}
+                                        disabled={groups.length <= 1}
+                                        className="ml-auto text-[10px] text-red-600 disabled:opacity-40"
+                                    >
+                                        削除
+                                    </button>
+                                </div>
+                                <select
+                                    aria-label={`小問${groupIndex + 1}パターン`}
+                                    value={group.pattern || "sub_parens"}
+                                    onChange={(e) =>
+                                        updateGroup(groupIndex, {
+                                            pattern: e.target
+                                                .value as SubQuestionPattern,
+                                        })
+                                    }
+                                    className="w-full px-2 py-1 border border-slate-300 rounded bg-white"
+                                >
+                                    <option value="sub_parens">
+                                        小問複合枠
+                                    </option>
+                                    <option value="grid">等分割グリッド</option>
+                                    <option value="circle_comma">
+                                        丸数字区分
+                                    </option>
+                                    <option value="split_2">左右2分割</option>
+                                    <option value="essay">記述欄</option>
+                                </select>
+
+                                {group.pattern === "sub_parens" && (
+                                    <div className="space-y-1.5">
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-[10px] text-slate-500">
+                                                行ごとのラベル・列数
+                                            </span>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    const rows =
+                                                        getSubParensRows(group);
+                                                    updateSubParensRows(
+                                                        groupIndex,
+                                                        [...rows, [""]],
+                                                    );
+                                                }}
+                                                className="px-1.5 py-0.5 text-[10px] text-indigo-700 border border-indigo-200 rounded"
+                                            >
+                                                ＋行
+                                            </button>
+                                        </div>
+                                        {getSubParensRows(group).map(
+                                            (row, rowIndex, rows) => (
+                                                <div
+                                                    key={`property-sub-row-${groupIndex}-${rowIndex}`}
+                                                    className="rounded border border-slate-200 bg-slate-50 p-2 space-y-1.5"
+                                                >
+                                                    <div className="flex items-center justify-between">
+                                                        <span className="text-[10px] font-semibold text-slate-500">
+                                                            {rowIndex + 1}行
+                                                        </span>
+                                                        <div className="flex items-center gap-1">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() =>
+                                                                    addSubParensColumn(
+                                                                        groupIndex,
+                                                                        rowIndex,
+                                                                    )
+                                                                }
+                                                                className="px-1.5 py-0.5 text-[10px] text-indigo-700 border border-indigo-200 rounded bg-white"
+                                                            >
+                                                                ＋列
+                                                            </button>
+                                                            {rows.length > 1 && (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() =>
+                                                                        updateSubParensRows(
+                                                                            groupIndex,
+                                                                            rows.filter(
+                                                                                (
+                                                                                    _,
+                                                                                    index,
+                                                                                ) =>
+                                                                                    index !==
+                                                                                    rowIndex,
+                                                                            ),
+                                                                        )
+                                                                    }
+                                                                    className="px-1.5 py-0.5 text-[10px] text-red-600 border border-red-200 rounded bg-white"
+                                                                >
+                                                                    行削除
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex flex-wrap items-center gap-1.5">
+                                                        {row.map(
+                                                            (
+                                                                label,
+                                                                colIndex,
+                                                            ) => (
+                                                                <div
+                                                                    key={`property-sub-col-${groupIndex}-${rowIndex}-${colIndex}`}
+                                                                    className="flex items-center gap-0.5"
+                                                                >
+                                                                    <input
+                                                                        type="text"
+                                                                        aria-label={`小問${groupIndex + 1} ${rowIndex + 1}行 ${colIndex + 1}列のラベル`}
+                                                                        value={
+                                                                            label
+                                                                        }
+                                                                        onChange={(
+                                                                            e,
+                                                                        ) =>
+                                                                            updateSubParensCell(
+                                                                                groupIndex,
+                                                                                rowIndex,
+                                                                                colIndex,
+                                                                                e
+                                                                                    .target
+                                                                                    .value,
+                                                                            )
+                                                                        }
+                                                                        className="w-16 px-1.5 py-1 border border-slate-300 rounded text-center font-mono bg-white"
+                                                                        placeholder="(a)"
+                                                                    />
+                                                                    {row.length >
+                                                                        1 && (
+                                                                        <button
+                                                                            type="button"
+                                                                            aria-label={`${rowIndex + 1}行 ${colIndex + 1}列を削除`}
+                                                                            onClick={() =>
+                                                                                removeSubParensColumn(
+                                                                                    groupIndex,
+                                                                                    rowIndex,
+                                                                                    colIndex,
+                                                                                )
+                                                                            }
+                                                                            className="px-1 py-0.5 text-[10px] text-red-600 hover:bg-red-50 rounded"
+                                                                        >
+                                                                            ×
+                                                                        </button>
+                                                                    )}
+                                                                </div>
+                                                            ),
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            ),
+                                        )}
+                                    </div>
+                                )}
+
+                                {group.pattern === "grid" && (
+                                    <div className="grid grid-cols-2 gap-1.5">
+                                        <input
+                                            type="number"
+                                            min={1}
+                                            value={group.gridRows || 1}
+                                            onChange={(e) =>
+                                                updateGroup(groupIndex, {
+                                                    gridRows:
+                                                        Number(
+                                                            e.target.value,
+                                                        ) || 1,
+                                                })
+                                            }
+                                            className="px-1.5 py-1 border border-slate-300 rounded text-center"
+                                            placeholder="行数"
+                                        />
+                                        <input
+                                            type="number"
+                                            min={1}
+                                            value={group.gridCols || 1}
+                                            onChange={(e) =>
+                                                updateGroup(groupIndex, {
+                                                    gridCols:
+                                                        Number(
+                                                            e.target.value,
+                                                        ) || 1,
+                                                })
+                                            }
+                                            className="px-1.5 py-1 border border-slate-300 rounded text-center"
+                                            placeholder="列数"
+                                        />
+                                    </div>
+                                )}
+
+                                {group.pattern === "circle_comma" && (
+                                    <div className="space-y-1.5">
+                                        <div className="grid grid-cols-2 gap-1.5">
+                                            <input
+                                                type="number"
+                                                min={1}
+                                                value={group.circleRows || 1}
+                                                onChange={(e) =>
+                                                    updateGroup(groupIndex, {
+                                                        circleRows:
+                                                            Number(
+                                                                e.target.value,
+                                                            ) || 1,
+                                                    })
+                                                }
+                                                className="px-1.5 py-1 border border-slate-300 rounded text-center"
+                                                placeholder="行数"
+                                            />
+                                            <input
+                                                type="number"
+                                                min={1}
+                                                value={group.circleCols || 1}
+                                                onChange={(e) =>
+                                                    updateGroup(groupIndex, {
+                                                        circleCols:
+                                                            Number(
+                                                                e.target.value,
+                                                            ) || 1,
+                                                    })
+                                                }
+                                                className="px-1.5 py-1 border border-slate-300 rounded text-center"
+                                                placeholder="列数"
+                                            />
+                                        </div>
+                                        <label className="flex items-center gap-1 text-[10px] text-slate-600">
+                                            <input
+                                                type="checkbox"
+                                                checked={
+                                                    group.circleCommaEnabled ??
+                                                    false
+                                                }
+                                                onChange={(e) =>
+                                                    updateGroup(groupIndex, {
+                                                        circleCommaEnabled:
+                                                            e.target.checked,
+                                                    })
+                                                }
+                                            />
+                                            「,」で区切る
+                                        </label>
+                                        <label className="flex items-center gap-1 text-[10px] text-slate-600">
+                                            <input
+                                                type="checkbox"
+                                                checked={
+                                                    group.circleCommaPaddingAuto ??
+                                                    true
+                                                }
+                                                disabled={
+                                                    !group.circleCommaEnabled
+                                                }
+                                                onChange={(e) =>
+                                                    updateGroup(groupIndex, {
+                                                        circleCommaPaddingAuto:
+                                                            e.target.checked,
+                                                    })
+                                                }
+                                            />
+                                            位置を自動調整
+                                        </label>
+                                        <label className="flex items-center gap-1 text-[10px] text-slate-600">
+                                            カンマ位置（セル幅に対する比率 %）
+                                            <input
+                                                type="number"
+                                                min={5}
+                                                max={95}
+                                                value={Math.round(
+                                                    ((group.circleCommaPaddingAuto ??
+                                                    true)
+                                                        ? getDefaultCircleCommaPaddingRatio(
+                                                              group.circleCols ||
+                                                                  1,
+                                                          )
+                                                        : (group.circleCommaPaddingRatio ??
+                                                          0.45)) * 100,
+                                                )}
+                                                disabled={
+                                                    !group.circleCommaEnabled ||
+                                                    (group.circleCommaPaddingAuto ??
+                                                        true)
+                                                }
+                                                onChange={(e) =>
+                                                    updateGroup(groupIndex, {
+                                                        circleCommaPaddingAuto: false,
+                                                        circleCommaPaddingRatio:
+                                                            Math.min(
+                                                                0.95,
+                                                                Math.max(
+                                                                    0.05,
+                                                                    (Number(
+                                                                        e.target
+                                                                            .value,
+                                                                    ) || 5) /
+                                                                        100,
+                                                                ),
+                                                            ),
+                                                    })
+                                                }
+                                                className="w-14 px-1 py-1 border border-slate-300 rounded text-center disabled:bg-slate-100"
+                                            />
+                                            %
+                                            {(group.circleCommaPaddingAuto ??
+                                                true) && (
+                                                <span className="text-slate-400">
+                                                    （自動）
+                                                </span>
+                                            )}
+                                        </label>
+                                    </div>
+                                )}
+
+                                {group.pattern === "split_2" && (
+                                    <select
+                                        value={group.splitRatio || "50:50"}
+                                        onChange={(e) =>
+                                            updateGroup(groupIndex, {
+                                                splitRatio: e.target.value,
+                                            })
+                                        }
+                                        className="w-full px-1.5 py-1 border border-slate-300 rounded bg-white"
+                                    >
+                                        <option value="50:50">50 : 50</option>
+                                        <option value="30:70">30 : 70</option>
+                                        <option value="70:30">70 : 30</option>
+                                    </select>
+                                )}
+                            </div>
+                        ))}
                     </div>
                 )}
             </div>

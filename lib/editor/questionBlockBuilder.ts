@@ -1,5 +1,9 @@
 import { fabric } from "fabric";
-import { QuestionBlockConfig } from "@/types/editor";
+import {
+    QuestionBlockConfig,
+    SubQuestionGroup,
+    SubQuestionPattern,
+} from "@/types/editor";
 import {
     SECTION_STANDARD_WIDTH,
     clampQuestionBlockWidth,
@@ -119,10 +123,7 @@ function interpolateCircleCommaPaddingRatio(count: number): number {
         const slope = (r4 - r3) / (c4 - c3);
         return Math.min(
             MAX_CIRCLE_COMMA_PADDING_RATIO,
-            Math.max(
-                MIN_CIRCLE_COMMA_PADDING_RATIO,
-                r3 + slope * (c - c3),
-            ),
+            Math.max(MIN_CIRCLE_COMMA_PADDING_RATIO, r3 + slope * (c - c3)),
         );
     }
 
@@ -130,10 +131,7 @@ function interpolateCircleCommaPaddingRatio(count: number): number {
         const [c6, r6] = anchors[anchors.length - 2];
         const [c7, r7] = anchors[anchors.length - 1];
         const slope = (r7 - r6) / (c7 - c6);
-        return Math.max(
-            MIN_CIRCLE_COMMA_PADDING_RATIO,
-            r7 + slope * (c - c7),
-        );
+        return Math.max(MIN_CIRCLE_COMMA_PADDING_RATIO, r7 + slope * (c - c7));
     }
 
     for (let i = 0; i < anchors.length - 1; i++) {
@@ -184,6 +182,497 @@ export interface CustomQuestionBlockGroup extends fabric.Group {
     questionConfig?: QuestionBlockConfig;
 }
 
+export interface GroupedRowLayout {
+    label: string;
+    y: number;
+    height: number;
+    labelWidth: number;
+    group: SubQuestionGroup;
+}
+
+export interface GroupedLayout {
+    rows: GroupedRowLayout[];
+    totalHeight: number;
+    labelWidth: number;
+    blockWidth: number;
+}
+
+const GROUPED_LABEL_WIDTH = 34;
+
+const DEFAULT_GROUPED_GROUPS: SubQuestionGroup[] = [
+    {
+        label: "1",
+        height: 42,
+        pattern: "grid",
+        gridRows: 1,
+        gridCols: 1,
+        cells: [{ label: "", widthRatio: 1, type: "box" }],
+    },
+    {
+        label: "2",
+        height: 42,
+        pattern: "sub_parens",
+        subRows: 1,
+        subCols: 3,
+        subLabels: ["(a)", "(b)", "(c)"],
+        cells: [
+            { label: "(a)", widthRatio: 1, type: "box" },
+            { label: "(b)", widthRatio: 1, type: "box" },
+            { label: "(c)", widthRatio: 1, type: "box" },
+        ],
+    },
+    {
+        label: "3",
+        height: 42,
+        pattern: "essay",
+        cells: [{ label: "", widthRatio: 1, type: "essay" }],
+    },
+];
+
+export function normalizeSubQuestionGroup(
+    group: SubQuestionGroup,
+    index = 0,
+): SubQuestionGroup {
+    if (group.pattern) {
+        return {
+            ...group,
+            label: String(group.label ?? index + 1),
+            height: Math.max(24, Number(group.height) || 42),
+        };
+    }
+
+    const cells = group.cells?.length
+        ? group.cells
+        : [{ label: "", widthRatio: 1, type: "box" as const }];
+    return {
+        ...group,
+        label: String(group.label ?? index + 1),
+        height: Math.max(24, Number(group.height) || 42),
+        pattern: "sub_parens",
+        subRows: 1,
+        subCols: cells.length,
+        subLabels: cells.map((cell) => String(cell.label || "")),
+        subRowHeight: Math.max(24, Number(group.height) || 42),
+    };
+}
+
+export function resolveGroupedGroups(
+    cfg: QuestionBlockConfig,
+): SubQuestionGroup[] {
+    const groups = cfg.groups?.length ? cfg.groups : DEFAULT_GROUPED_GROUPS;
+    return groups.map((group, index) =>
+        normalizeSubQuestionGroup(group, index),
+    );
+}
+
+export function buildGroupedLayout(
+    cfg: QuestionBlockConfig,
+    blockWidth: number,
+): GroupedLayout {
+    let y = 0;
+    const rows = resolveGroupedGroups(cfg).map((group) => {
+        const height = Math.max(24, Number(group.height) || 42);
+        const row = {
+            label: String(group.label || ""),
+            y,
+            height,
+            labelWidth: String(group.label || "").trim()
+                ? GROUPED_LABEL_WIDTH
+                : 0,
+            group,
+        };
+        y += height;
+        return row;
+    });
+
+    return {
+        rows,
+        totalHeight: y,
+        labelWidth: GROUPED_LABEL_WIDTH,
+        blockWidth,
+    };
+}
+
+function groupedCellTagWidth(label: string): number {
+    return Math.min(Math.max(28, label.length * 9 + 12), Math.max(28, 160));
+}
+
+function resolveGroupPattern(group: SubQuestionGroup): SubQuestionPattern {
+    return group.pattern || "sub_parens";
+}
+
+export function resolveSubParensRows(group: SubQuestionGroup): string[][] {
+    if (group.subRowConfigs?.length) {
+        return group.subRowConfigs.map((row) =>
+            row.labels.map((label) => String(label ?? "")),
+        );
+    }
+
+    const rows = Math.max(1, Number(group.subRows) || 1);
+    const cols = Math.max(1, Number(group.subCols) || 1);
+    const labels = group.subLabels || [];
+
+    return Array.from({ length: rows }, (_, rowIndex) =>
+        Array.from(
+            { length: cols },
+            (_, colIndex) => labels[rowIndex * cols + colIndex] || "",
+        ),
+    );
+}
+
+function resolveGroupRows(group: SubQuestionGroup): number {
+    if (resolveGroupPattern(group) === "sub_parens") {
+        return resolveSubParensRows(group).length;
+    }
+    if (resolveGroupPattern(group) === "grid") {
+        return Math.max(1, Number(group.gridRows) || 1);
+    }
+    if (resolveGroupPattern(group) === "circle_comma") {
+        return Math.max(1, Number(group.circleRows) || 1);
+    }
+    return 1;
+}
+
+function resolveGroupedCommaPadding(
+    group: SubQuestionGroup,
+    cols: number,
+    cellWidth: number,
+): number {
+    const ratio =
+        group.circleCommaPaddingAuto !== false
+            ? getDefaultCircleCommaPaddingRatio(cols)
+            : Math.min(
+                  0.95,
+                  Math.max(
+                      0.05,
+                      group.circleCommaPaddingRatio ??
+                          getDefaultCircleCommaPaddingRatio(cols),
+                  ),
+              );
+    return Math.max(5, cellWidth * ratio);
+}
+
+function addGroupedPatternFabric(
+    items: fabric.Object[],
+    group: SubQuestionGroup,
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+) {
+    const pattern = resolveGroupPattern(group);
+    const rows = resolveGroupRows(group);
+    const rowHeight = height / rows;
+
+    if (pattern === "essay") {
+        items.push(
+            new fabric.Rect({
+                left: x,
+                top: y,
+                width,
+                height,
+                fill: "transparent",
+                stroke: "#000000",
+                strokeWidth: 1,
+            }),
+        );
+        return;
+    }
+
+    if (pattern === "split_2") {
+        let leftWidth = width * 0.5;
+        if (group.splitRatio === "30:70") leftWidth = width * 0.3;
+        if (group.splitRatio === "70:30") leftWidth = width * 0.7;
+        items.push(
+            new fabric.Rect({
+                left: x,
+                top: y,
+                width: leftWidth,
+                height,
+                fill: "transparent",
+                stroke: "#000000",
+                strokeWidth: 1,
+            }),
+            new fabric.Rect({
+                left: x + leftWidth,
+                top: y,
+                width: width - leftWidth,
+                height,
+                fill: "transparent",
+                stroke: "#000000",
+                strokeWidth: 1,
+            }),
+        );
+        return;
+    }
+
+    if (pattern === "sub_parens") {
+        const rowLabels = resolveSubParensRows(group);
+        const rowHeight = height / rowLabels.length;
+
+        rowLabels.forEach((labels, row) => {
+            const cols = Math.max(1, labels.length);
+            const cellWidth = width / cols;
+            labels.forEach((label, col) => {
+                const cellX = x + col * cellWidth;
+                const cellY = y + row * rowHeight;
+                items.push(
+                    new fabric.Rect({
+                        left: cellX,
+                        top: cellY,
+                        width: cellWidth,
+                        height: rowHeight,
+                        fill: "transparent",
+                        stroke: "#000000",
+                        strokeWidth: 1,
+                    }),
+                );
+                if (label) {
+                    const tagWidth = Math.min(
+                        groupedCellTagWidth(label),
+                        cellWidth,
+                    );
+                    items.push(
+                        new fabric.Rect({
+                            left: cellX,
+                            top: cellY,
+                            width: tagWidth,
+                            height: rowHeight,
+                            fill: "transparent",
+                            stroke: "#000000",
+                            strokeWidth: 1,
+                        }),
+                        new fabric.Text(label, {
+                            left: cellX + tagWidth / 2,
+                            top: cellY + rowHeight / 2,
+                            originX: "center",
+                            originY: "center",
+                            fontFamily: "'Noto Sans JP', sans-serif",
+                            fontSize: 11,
+                            fill: "#000000",
+                        }),
+                    );
+                }
+            });
+        });
+        return;
+    }
+
+    const cols =
+        pattern === "grid"
+              ? Math.max(1, Number(group.gridCols) || 1)
+              : Math.max(1, Number(group.circleCols) || 1);
+    const cellWidth = width / cols;
+
+    if (pattern === "circle_comma") {
+        items.push(
+            new fabric.Rect({
+                left: x,
+                top: y,
+                width,
+                height,
+                fill: "transparent",
+                stroke: "#000000",
+                strokeWidth: 1,
+            }),
+        );
+        for (let col = 1; col < cols; col++) {
+            items.push(
+                new fabric.Line(
+                    [x + col * cellWidth, y, x + col * cellWidth, y + height],
+                    {
+                        stroke: "#000000",
+                        strokeWidth: 1,
+                        selectable: false,
+                        evented: false,
+                    },
+                ),
+            );
+        }
+        for (let row = 1; row < rows; row++) {
+            items.push(
+                new fabric.Line(
+                    [x, y + row * rowHeight, x + width, y + row * rowHeight],
+                    {
+                        stroke: "#000000",
+                        strokeWidth: 1,
+                        selectable: false,
+                        evented: false,
+                    },
+                ),
+            );
+        }
+        for (let row = 0; row < rows; row++) {
+            for (let col = 0; col < cols; col++) {
+                const index = row * cols + col;
+                const label = CIRCLE_NUMBER_LABELS[index] || String(index + 1);
+                items.push(
+                    new fabric.Text(label, {
+                        left: x + col * cellWidth + 16,
+                        top: y + row * rowHeight + rowHeight / 2,
+                        originX: "center",
+                        originY: "center",
+                        fontFamily: "'Noto Sans JP', sans-serif",
+                        fontSize: 12,
+                        fill: "#000000",
+                    }),
+                );
+                if (group.circleCommaEnabled) {
+                    items.push(
+                        new fabric.Text(",", {
+                            left:
+                                x +
+                                (col + 1) * cellWidth -
+                                resolveGroupedCommaPadding(
+                                    group,
+                                    cols,
+                                    cellWidth,
+                                ),
+                            top: y + row * rowHeight + rowHeight / 2,
+                            originX: "center",
+                            originY: "center",
+                            fontFamily: "'Noto Sans JP', sans-serif",
+                            fontSize: 12,
+                            fill: "#000000",
+                        }),
+                    );
+                }
+            }
+        }
+        return;
+    }
+
+    for (let row = 0; row < rows; row++) {
+        for (let col = 0; col < cols; col++) {
+            const cellX = x + col * cellWidth;
+            const cellY = y + row * rowHeight;
+            items.push(
+                new fabric.Rect({
+                    left: cellX,
+                    top: cellY,
+                    width: cellWidth,
+                    height: rowHeight,
+                    fill: "transparent",
+                    stroke: "#000000",
+                    strokeWidth: 1,
+                }),
+            );
+        }
+    }
+}
+
+function drawGroupedPatternCanvas(
+    ctx: CanvasRenderingContext2D,
+    group: SubQuestionGroup,
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+) {
+    const pattern = resolveGroupPattern(group);
+    const rows = resolveGroupRows(group);
+    const rowHeight = height / rows;
+
+    if (pattern === "essay") {
+        ctx.strokeRect(x, y, width, height);
+        return;
+    }
+    if (pattern === "split_2") {
+        let leftWidth = width * 0.5;
+        if (group.splitRatio === "30:70") leftWidth = width * 0.3;
+        if (group.splitRatio === "70:30") leftWidth = width * 0.7;
+        ctx.strokeRect(x, y, leftWidth, height);
+        ctx.strokeRect(x + leftWidth, y, width - leftWidth, height);
+        return;
+    }
+
+    if (pattern === "sub_parens") {
+        const rowLabels = resolveSubParensRows(group);
+        const rowHeight = height / rowLabels.length;
+
+        rowLabels.forEach((labels, row) => {
+            const cols = Math.max(1, labels.length);
+            const cellWidth = width / cols;
+            labels.forEach((label, col) => {
+                const cellX = x + col * cellWidth;
+                const cellY = y + row * rowHeight;
+                ctx.strokeRect(cellX, cellY, cellWidth, rowHeight);
+                if (label) {
+                    const tagWidth = Math.min(
+                        groupedCellTagWidth(label),
+                        cellWidth,
+                    );
+                    ctx.strokeRect(cellX, cellY, tagWidth, rowHeight);
+                    ctx.fillStyle = "#000000";
+                    ctx.font = "11px 'Noto Sans JP', sans-serif";
+                    ctx.textAlign = "center";
+                    ctx.textBaseline = "middle";
+                    ctx.fillText(
+                        label,
+                        cellX + tagWidth / 2,
+                        cellY + rowHeight / 2,
+                    );
+                }
+            });
+        });
+        return;
+    }
+
+    const cols =
+        pattern === "grid"
+              ? Math.max(1, Number(group.gridCols) || 1)
+              : Math.max(1, Number(group.circleCols) || 1);
+    const cellWidth = width / cols;
+    ctx.strokeRect(x, y, width, height);
+
+    if (pattern === "circle_comma") {
+        for (let col = 1; col < cols; col++) {
+            ctx.beginPath();
+            ctx.moveTo(x + col * cellWidth, y);
+            ctx.lineTo(x + col * cellWidth, y + height);
+            ctx.stroke();
+        }
+        for (let row = 1; row < rows; row++) {
+            ctx.beginPath();
+            ctx.moveTo(x, y + row * rowHeight);
+            ctx.lineTo(x + width, y + row * rowHeight);
+            ctx.stroke();
+        }
+        ctx.fillStyle = "#000000";
+        ctx.font = "12px 'Noto Sans JP', sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        for (let row = 0; row < rows; row++) {
+            for (let col = 0; col < cols; col++) {
+                const index = row * cols + col;
+                ctx.fillText(
+                    CIRCLE_NUMBER_LABELS[index] || String(index + 1),
+                    x + col * cellWidth + 16,
+                    y + row * rowHeight + rowHeight / 2,
+                );
+                if (group.circleCommaEnabled) {
+                    ctx.fillText(
+                        ",",
+                        x +
+                            (col + 1) * cellWidth -
+                            resolveGroupedCommaPadding(group, cols, cellWidth),
+                        y + row * rowHeight + rowHeight / 2,
+                    );
+                }
+            }
+        }
+        return;
+    }
+
+    for (let row = 0; row < rows; row++) {
+        for (let col = 0; col < cols; col++) {
+            const cellX = x + col * cellWidth;
+            const cellY = y + row * rowHeight;
+            ctx.strokeRect(cellX, cellY, cellWidth, rowHeight);
+        }
+    }
+}
+
 /**
  * モーダル等の設定情報（QuestionBlockConfig）から、Fabric.jsのグループオブジェクトを生成する。
  * 各子オブジェクトの座標を相対配置で正しく計算し、確実にキャンバスへ配置できるようにする。
@@ -195,9 +684,7 @@ export function resolveQuestionBlockWidth(
     if (override !== undefined) {
         return clampQuestionBlockWidth(override);
     }
-    return clampQuestionBlockWidth(
-        cfg.blockWidth ?? SECTION_STANDARD_WIDTH,
-    );
+    return clampQuestionBlockWidth(cfg.blockWidth ?? SECTION_STANDARD_WIDTH);
 }
 
 export function createQuestionBlock(
@@ -342,15 +829,12 @@ export function createQuestionBlock(
         for (let r = 1; r < layout.rows; r++) {
             const y = tableTop + r * layout.rowHeight;
             items.push(
-                new fabric.Line(
-                    [0, y, layout.blockWidth, y],
-                    {
-                        stroke: "#000000",
-                        strokeWidth: 1,
-                        selectable: false,
-                        evented: false,
-                    },
-                ),
+                new fabric.Line([0, y, layout.blockWidth, y], {
+                    stroke: "#000000",
+                    strokeWidth: 1,
+                    selectable: false,
+                    evented: false,
+                }),
             );
         }
 
@@ -418,6 +902,57 @@ export function createQuestionBlock(
                 strokeWidth: 1,
             }),
         );
+    } else if (cfg.pattern === "grouped") {
+        const layout = buildGroupedLayout(cfg, blockWidth);
+
+        for (const row of layout.rows) {
+            const y = tableTop + row.y;
+            items.push(
+                new fabric.Rect({
+                    left: 0,
+                    top: y,
+                    width: layout.blockWidth,
+                    height: row.height,
+                    fill: "transparent",
+                    stroke: "#000000",
+                    strokeWidth: 1,
+                }),
+            );
+            if (row.label) {
+                items.push(
+                    new fabric.Text(row.label, {
+                        left: row.labelWidth / 2,
+                        top: y + row.height / 2,
+                        originX: "center",
+                        originY: "center",
+                        fontFamily: "'Noto Sans JP', sans-serif",
+                        fontSize: 12,
+                        fill: "#000000",
+                    }),
+                );
+            }
+            if (row.labelWidth > 0) {
+                items.push(
+                    new fabric.Line(
+                        [row.labelWidth, y, row.labelWidth, y + row.height],
+                        {
+                            stroke: "#000000",
+                            strokeWidth: 1,
+                            selectable: false,
+                            evented: false,
+                        },
+                    ),
+                );
+            }
+            addGroupedPatternFabric(
+                items,
+                row.group,
+                row.labelWidth,
+                y,
+                layout.blockWidth - row.labelWidth,
+                row.height,
+            );
+        }
     }
 
     const group = new fabric.Group(items, {
@@ -429,9 +964,7 @@ export function createQuestionBlock(
     }) as CustomQuestionBlockGroup;
 
     group.customType = "question-block";
-    group.questionConfig = JSON.parse(
-        JSON.stringify({ ...cfg, blockWidth }),
-    );
+    group.questionConfig = JSON.parse(JSON.stringify({ ...cfg, blockWidth }));
     group.setCoords();
 
     return group;
@@ -458,6 +991,9 @@ export function drawModalPreviewCanvas(
         totalH = 30 + rows * cfg.circleHeight;
     }
     if (cfg.pattern === "split_2") totalH = 30 + cfg.splitHeight;
+    if (cfg.pattern === "grouped") {
+        totalH = 30 + buildGroupedLayout(cfg, resolvedWidth).totalHeight;
+    }
 
     const dpr =
         typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
@@ -568,5 +1104,34 @@ export function drawModalPreviewCanvas(
         if (cfg.splitRatio === "70:30") leftW = resolvedWidth * 0.7;
         ctx.strokeRect(0, tableTop, leftW, cfg.splitHeight);
         ctx.strokeRect(leftW, tableTop, resolvedWidth - leftW, cfg.splitHeight);
+    } else if (cfg.pattern === "grouped") {
+        const layout = buildGroupedLayout(cfg, resolvedWidth);
+        for (const row of layout.rows) {
+            const y = tableTop + row.y;
+            ctx.strokeRect(0, y, layout.blockWidth, row.height);
+            if (row.labelWidth > 0) {
+                ctx.beginPath();
+                ctx.moveTo(row.labelWidth, y);
+                ctx.lineTo(row.labelWidth, y + row.height);
+                ctx.stroke();
+            }
+
+            if (row.label) {
+                ctx.fillStyle = "#000000";
+                ctx.font = "12px 'Noto Sans JP', sans-serif";
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
+                ctx.fillText(row.label, row.labelWidth / 2, y + row.height / 2);
+            }
+
+            drawGroupedPatternCanvas(
+                ctx,
+                row.group,
+                row.labelWidth,
+                y,
+                layout.blockWidth - row.labelWidth,
+                row.height,
+            );
+        }
     }
 }

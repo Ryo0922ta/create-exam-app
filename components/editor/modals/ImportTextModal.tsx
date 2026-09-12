@@ -7,10 +7,14 @@ import React, {
     useCallback,
     useLayoutEffect,
 } from "react";
-import { QuestionBlockConfig } from "@/types/editor";
-import { extractSymbolsFromText } from "@/lib/editor/symbolParser";
+import { QuestionBlockConfig, SubQuestionGroup } from "@/types/editor";
+import {
+    convertParsedGroupsToSubQuestionGroups,
+    parseQuestionGroups,
+} from "@/lib/editor/symbolParser";
 import { drawModalPreviewCanvas } from "@/lib/editor/questionBlockBuilder";
 import { SECTION_STANDARD_WIDTH } from "@/lib/editor/paperSizes";
+import { GroupedQuestionEditor } from "@/components/editor/GroupedQuestionEditor";
 
 interface ImportTextModalProps {
     isOpen: boolean;
@@ -27,24 +31,38 @@ export const ImportTextModal: React.FC<ImportTextModalProps> = ({
     const [text, setText] = useState("");
     const [qNum, setQNum] = useState("1");
     const [qRubric, setQRubric] = useState("○・△・×");
-    const [rows, setRows] = useState(3);
-    const [cols, setCols] = useState(3);
+    const [parsedGroups, setParsedGroups] = useState<
+        ReturnType<typeof parseQuestionGroups>
+    >([]);
+    const [groups, setGroups] = useState<SubQuestionGroup[]>([]);
     const [detectedSymbols, setDetectedSymbols] = useState<string[]>([]);
 
     useEffect(() => {
         if (!isOpen) return;
-        const symbols = extractSymbolsFromText(text);
-        setDetectedSymbols(symbols);
-
-        if (symbols.length > 0) {
-            const currentCols = Number(cols) || 3;
-            const neededRows = Math.ceil(symbols.length / currentCols);
-            setRows(Math.max(neededRows, 1));
-        }
-    }, [text, cols, isOpen]);
+        const parsed = parseQuestionGroups(text);
+        setParsedGroups(parsed);
+        setGroups(convertParsedGroupsToSubQuestionGroups(parsed));
+        setDetectedSymbols(
+            parsed.flatMap((group) => [
+                ...group.labels,
+                ...group.unclassifiedLabels,
+            ]),
+        );
+    }, [text, isOpen]);
 
     const getPreviewConfig = useCallback((): QuestionBlockConfig => {
-        const symbolCount = detectedSymbols.length;
+        const symbolCount = groups.reduce(
+            (sum, group) =>
+                sum +
+                (group.subRowConfigs?.reduce(
+                    (rowSum, row) => rowSum + row.labels.length,
+                    0,
+                ) ||
+                    group.subLabels?.length ||
+                    (group.circleRows || 1) * (group.circleCols || 1) ||
+                    1),
+            0,
+        );
         return {
             num: qNum.trim() || "1",
             rubric: qRubric.trim() || "○・△・×",
@@ -52,11 +70,11 @@ export const ImportTextModal: React.FC<ImportTextModalProps> = ({
                 symbolCount > 0
                     ? `各問1点/${symbolCount}点`
                     : "各問1点/0点",
-            pattern: "sub_parens",
-            subRows: Number(rows) || 1,
-            subCols: Number(cols) || 1,
-            subRowHeight: 34,
-            subLabels: detectedSymbols,
+            pattern: "grouped",
+            subRows: 1,
+            subCols: 1,
+            subRowHeight: 42,
+            subLabels: [],
             gridRows: 2,
             gridCols: 4,
             gridRowHeight: 32,
@@ -67,11 +85,13 @@ export const ImportTextModal: React.FC<ImportTextModalProps> = ({
             circleCommaEnabled: false,
             circleCommaCount: 1,
             circleCommaPaddingAuto: true,
+            circleCommaPaddingRatio: 0.451,
             splitRatio: "50:50",
             splitHeight: 38,
+            groups,
             blockWidth: SECTION_STANDARD_WIDTH,
         };
-    }, [qNum, qRubric, rows, cols, detectedSymbols]);
+    }, [qNum, qRubric, groups]);
 
     useLayoutEffect(() => {
         if (!isOpen || !previewCanvasRef.current) return;
@@ -84,8 +104,8 @@ export const ImportTextModal: React.FC<ImportTextModalProps> = ({
     if (!isOpen) return null;
 
     const handleApply = () => {
-        if (detectedSymbols.length === 0) {
-            alert("問題文から小問記号が検出されませんでした");
+        if (groups.length === 0) {
+            alert("大問直下の小問番号（例: (1), (2)）が検出されませんでした");
             return;
         }
 
@@ -124,7 +144,7 @@ export const ImportTextModal: React.FC<ImportTextModalProps> = ({
                         </span>
                         ,{" "}
                         <span className="font-mono bg-purple-50 text-purple-700 px-1 py-0.5 rounded border border-purple-200">
-                            (ア)
+                            (a)
                         </span>{" "}
                         などの小問記号を自動抽出し解答枠を作成します。
                         <br />
@@ -153,7 +173,8 @@ export const ImportTextModal: React.FC<ImportTextModalProps> = ({
                             <span className="font-bold text-purple-900 flex items-center gap-1.5">
                                 <span>検出された小問記号:</span>
                                 <span className="bg-purple-200 text-purple-800 text-[10px] px-2 py-0.5 rounded-full font-mono font-bold">
-                                    {detectedSymbols.length}問
+                                    {parsedGroups.length}小問 /{" "}
+                                    {detectedSymbols.length}ラベル
                                 </span>
                             </span>
                         </div>
@@ -199,37 +220,15 @@ export const ImportTextModal: React.FC<ImportTextModalProps> = ({
                                 className="w-full px-2.5 py-1.5 border border-slate-300 rounded bg-white"
                             />
                         </div>
-                        <div className="col-span-3">
-                            <label className="block text-slate-600 font-semibold mb-1">
-                                列数
-                            </label>
-                            <input
-                                type="number"
-                                value={cols}
-                                min={1}
-                                max={8}
-                                onChange={(e) =>
-                                    setCols(parseInt(e.target.value, 10) || 1)
-                                }
-                                className="w-full px-2.5 py-1.5 border border-slate-300 rounded text-center bg-white"
-                            />
-                        </div>
-                        <div className="col-span-3">
-                            <label className="block text-slate-600 font-semibold mb-1">
-                                行数
-                            </label>
-                            <input
-                                type="number"
-                                value={rows}
-                                min={1}
-                                max={10}
-                                onChange={(e) =>
-                                    setRows(parseInt(e.target.value, 10) || 1)
-                                }
-                                className="w-full px-2.5 py-1.5 border border-slate-300 rounded text-center bg-white"
-                            />
-                        </div>
                     </div>
+
+                    {groups.length > 0 && (
+                        <GroupedQuestionEditor
+                            groups={groups}
+                            onChange={setGroups}
+                            title="解析された小問グループ"
+                        />
+                    )}
 
                     {/* リアルタイムプレビュー */}
                     <div>
@@ -237,7 +236,7 @@ export const ImportTextModal: React.FC<ImportTextModalProps> = ({
                             プレビュー (原寸比)
                         </span>
                         <div className="border border-slate-300 rounded-lg p-3 bg-white shadow-inner overflow-x-auto mt-1 flex justify-center items-start min-h-[100px]">
-                            {detectedSymbols.length === 0 ? (
+                            {groups.length === 0 ? (
                                 <p className="text-slate-400 italic text-[11px] py-6">
                                     問題文を入力すると解答枠のプレビューが表示されます
                                 </p>
