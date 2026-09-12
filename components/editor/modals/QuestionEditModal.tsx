@@ -17,6 +17,7 @@ import {
     QUESTION_BLOCK_WIDTH_LIMITS,
     clampQuestionBlockWidth,
 } from "@/lib/editor/paperSizes";
+import { PAPER_SIZES, B4_LANDSCAPE_MM } from "@/lib/editor/paperSizes";
 
 interface QuestionEditModalProps {
     isOpen: boolean;
@@ -217,9 +218,14 @@ export const QuestionEditModal: React.FC<QuestionEditModalProps> = ({
         onClose();
     };
 
+    const blockWidthMm = Math.round(
+        (Number(blockWidth) / PAPER_SIZES.B4_LANDSCAPE.widthPx) *
+            B4_LANDSCAPE_MM.width,
+    );
+
     return (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full flex flex-col max-h-[92vh] overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95 duration-150">
+            <div className="bg-white rounded-xl shadow-2xl max-w-3xl w-full flex flex-col max-h-[92vh] overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95 duration-150">
                 {/* ヘッダー */}
                 <div className="px-5 py-3.5 bg-slate-900 text-white flex items-center justify-between">
                     <h3 className="text-sm font-bold flex items-center gap-2">
@@ -247,6 +253,7 @@ export const QuestionEditModal: React.FC<QuestionEditModalProps> = ({
                             </label>
                             <input
                                 type="text"
+                                aria-label="大問番号"
                                 value={num}
                                 onChange={(e) => setNum(e.target.value)}
                                 className="w-full px-2.5 py-1.5 border border-slate-300 rounded font-bold text-center bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
@@ -258,6 +265,7 @@ export const QuestionEditModal: React.FC<QuestionEditModalProps> = ({
                             </label>
                             <input
                                 type="text"
+                                aria-label="観点区分"
                                 value={rubric}
                                 placeholder="例: ○・△・×, 知識・技能"
                                 onChange={(e) => setRubric(e.target.value)}
@@ -270,6 +278,7 @@ export const QuestionEditModal: React.FC<QuestionEditModalProps> = ({
                             </label>
                             <input
                                 type="text"
+                                aria-label="配点注記"
                                 value={points}
                                 placeholder="例: 各問1点/10点"
                                 onChange={(e) => setPoints(e.target.value)}
@@ -286,6 +295,7 @@ export const QuestionEditModal: React.FC<QuestionEditModalProps> = ({
                             <div className="flex items-center gap-1">
                                 <input
                                     type="number"
+                                    aria-label="大問の横幅（px）"
                                     min={QUESTION_BLOCK_WIDTH_LIMITS.min}
                                     max={QUESTION_BLOCK_WIDTH_LIMITS.max}
                                     step={4}
@@ -312,10 +322,14 @@ export const QuestionEditModal: React.FC<QuestionEditModalProps> = ({
                                 <span className="text-slate-500 text-[10px]">
                                     px
                                 </span>
+                                <span className="text-slate-500 text-[10px]">
+                                    （約{blockWidthMm}mm）
+                                </span>
                             </div>
                         </div>
                         <input
                             type="range"
+                            aria-label="大問の横幅（px）"
                             min={QUESTION_BLOCK_WIDTH_LIMITS.min}
                             max={QUESTION_BLOCK_WIDTH_LIMITS.max}
                             step={4}
@@ -346,6 +360,7 @@ export const QuestionEditModal: React.FC<QuestionEditModalProps> = ({
                             >
                                 <input
                                     type="radio"
+                                    aria-label="小問複合枠"
                                     name="q-pattern"
                                     value="sub_parens"
                                     checked={pattern === "sub_parens"}
@@ -355,6 +370,9 @@ export const QuestionEditModal: React.FC<QuestionEditModalProps> = ({
                                 <span>(1)(2) 小問複合枠</span>
                                 <span className="text-[10px] text-slate-500 mt-0.5">
                                     行×列 & ラベル
+                                </span>
+                                <span className="text-[10px] leading-tight text-indigo-600 mt-0.5">
+                                    用途例：選択式・小問が複数
                                 </span>
                             </label>
 
@@ -367,6 +385,7 @@ export const QuestionEditModal: React.FC<QuestionEditModalProps> = ({
                             >
                                 <input
                                     type="radio"
+                                    aria-label="等分割グリッド"
                                     name="q-pattern"
                                     value="grid"
                                     checked={pattern === "grid"}
@@ -376,6 +395,9 @@ export const QuestionEditModal: React.FC<QuestionEditModalProps> = ({
                                 <span>等分割グリッド</span>
                                 <span className="text-[10px] text-slate-500 mt-0.5">
                                     シンプルなマス目
+                                </span>
+                                <span className="text-[10px] leading-tight text-indigo-600 mt-0.5">
+                                    用途例：選択式・均等な解答欄
                                 </span>
                             </label>
 
@@ -388,6 +410,7 @@ export const QuestionEditModal: React.FC<QuestionEditModalProps> = ({
                             >
                                 <input
                                     type="radio"
+                                    aria-label="丸数字区分"
                                     name="q-pattern"
                                     value="circle_comma"
                                     checked={pattern === "circle_comma"}
@@ -397,6 +420,9 @@ export const QuestionEditModal: React.FC<QuestionEditModalProps> = ({
                                 <span>丸数字区分</span>
                                 <span className="text-[10px] text-slate-500 mt-0.5">
                                     ① , ② , ③...
+                                </span>
+                                <span className="text-[10px] leading-tight text-indigo-600 mt-0.5">
+                                    用途例：番号付きの記号解答
                                 </span>
                             </label>
 
@@ -409,6 +435,7 @@ export const QuestionEditModal: React.FC<QuestionEditModalProps> = ({
                             >
                                 <input
                                     type="radio"
+                                    aria-label="左右2分割枠"
                                     name="q-pattern"
                                     value="split_2"
                                     checked={pattern === "split_2"}
@@ -418,6 +445,9 @@ export const QuestionEditModal: React.FC<QuestionEditModalProps> = ({
                                 <span>左右2分割枠</span>
                                 <span className="text-[10px] text-slate-500 mt-0.5">
                                     記述・長文向け
+                                </span>
+                                <span className="text-[10px] leading-tight text-indigo-600 mt-0.5">
+                                    用途例：記述・長文回答
                                 </span>
                             </label>
                         </div>
@@ -434,6 +464,7 @@ export const QuestionEditModal: React.FC<QuestionEditModalProps> = ({
                                         </label>
                                         <input
                                             type="number"
+                                            aria-label="小問複合枠の行数"
                                             value={subRows}
                                             min={1}
                                             max={10}
@@ -454,6 +485,7 @@ export const QuestionEditModal: React.FC<QuestionEditModalProps> = ({
                                         </label>
                                         <input
                                             type="number"
+                                            aria-label="小問複合枠の列数"
                                             value={subCols}
                                             min={1}
                                             max={8}
@@ -474,6 +506,7 @@ export const QuestionEditModal: React.FC<QuestionEditModalProps> = ({
                                         </label>
                                         <input
                                             type="number"
+                                            aria-label="小問複合枠の1行の高さ（px）"
                                             value={subRowHeight}
                                             min={20}
                                             max={80}
@@ -504,6 +537,7 @@ export const QuestionEditModal: React.FC<QuestionEditModalProps> = ({
                                     </div>
                                     <input
                                         type="text"
+                                        aria-label="小問記号（カンマ区切り）"
                                         value={subLabelsText}
                                         onChange={(e) =>
                                             setSubLabelsText(e.target.value)
@@ -526,6 +560,7 @@ export const QuestionEditModal: React.FC<QuestionEditModalProps> = ({
                                     </label>
                                     <input
                                         type="number"
+                                        aria-label="グリッド枠の行数"
                                         value={gridRows}
                                         min={1}
                                         max={10}
@@ -544,6 +579,7 @@ export const QuestionEditModal: React.FC<QuestionEditModalProps> = ({
                                     </label>
                                     <input
                                         type="number"
+                                        aria-label="グリッド枠の列数"
                                         value={gridCols}
                                         min={1}
                                         max={10}
@@ -562,6 +598,7 @@ export const QuestionEditModal: React.FC<QuestionEditModalProps> = ({
                                     </label>
                                     <input
                                         type="number"
+                                        aria-label="グリッド枠の1行の高さ（px）"
                                         value={gridRowHeight}
                                         min={20}
                                         max={80}
@@ -586,6 +623,7 @@ export const QuestionEditModal: React.FC<QuestionEditModalProps> = ({
                                         </label>
                                         <input
                                             type="number"
+                                            aria-label="丸数字枠の行数"
                                             value={circleRows}
                                             min={1}
                                             max={10}
@@ -606,6 +644,7 @@ export const QuestionEditModal: React.FC<QuestionEditModalProps> = ({
                                         </label>
                                         <input
                                             type="number"
+                                            aria-label="丸数字枠の列数"
                                             value={circleCols}
                                             min={1}
                                             max={15}
@@ -626,6 +665,7 @@ export const QuestionEditModal: React.FC<QuestionEditModalProps> = ({
                                         </label>
                                         <input
                                             type="number"
+                                            aria-label="丸数字枠の1行の高さ（px）"
                                             value={circleHeight}
                                             min={20}
                                             max={80}
@@ -645,6 +685,7 @@ export const QuestionEditModal: React.FC<QuestionEditModalProps> = ({
                                     <label className="flex items-center gap-2 text-slate-700 font-semibold cursor-pointer">
                                         <input
                                             type="checkbox"
+                                            aria-label="カンマ区切りを有効にする"
                                             checked={circleCommaEnabled}
                                             disabled={
                                                 circleRows * circleCols <= 1
@@ -664,6 +705,7 @@ export const QuestionEditModal: React.FC<QuestionEditModalProps> = ({
                                             <label className="flex items-center gap-2 text-slate-700 font-semibold cursor-pointer">
                                                 <input
                                                     type="checkbox"
+                                                    aria-label="カンマ位置を自動調整"
                                                     checked={
                                                         circleCommaPaddingAuto
                                                     }
@@ -693,6 +735,7 @@ export const QuestionEditModal: React.FC<QuestionEditModalProps> = ({
                                                 <div className="flex items-center gap-2">
                                                     <input
                                                         type="number"
+                                                        aria-label="カンマ位置（%）"
                                                         value={Math.round(
                                                             (circleCommaPaddingAuto
                                                                 ? getDefaultCircleCommaPaddingRatio(
@@ -750,6 +793,7 @@ export const QuestionEditModal: React.FC<QuestionEditModalProps> = ({
                                         分割比率
                                     </label>
                                     <select
+                                        aria-label="左右2分割の分割比率"
                                         value={splitRatio}
                                         onChange={(e) =>
                                             setSplitRatio(e.target.value)
@@ -773,6 +817,7 @@ export const QuestionEditModal: React.FC<QuestionEditModalProps> = ({
                                     </label>
                                     <input
                                         type="number"
+                                        aria-label="左右2分割枠の高さ（px）"
                                         value={splitHeight}
                                         min={25}
                                         max={120}

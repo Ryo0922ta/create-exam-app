@@ -20,6 +20,7 @@ export default function RootLayout({
                     href="https://fonts.gstatic.com"
                     crossOrigin="anonymous"
                 />
+                {/* eslint-disable-next-line @next/next/no-page-custom-font */}
                 <link
                     href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=Noto+Serif+JP:wght@400;600;700&display=swap"
                     rel="stylesheet"

@@ -26,6 +26,7 @@ import {
     QUESTION_BLOCK_WIDTH_LIMITS,
     clampQuestionBlockWidth,
 } from "@/lib/editor/paperSizes";
+import { PAPER_SIZES, B4_LANDSCAPE_MM } from "@/lib/editor/paperSizes";
 
 export type CustomFabricBlock =
     | CustomQuestionBlockGroup
@@ -230,6 +231,7 @@ const ExamHeaderForm: React.FC<ExamHeaderFormProps> = ({
                         見出しテキスト
                     </label>
                     <textarea
+                        aria-label="見出しテキスト"
                         rows={3}
                         value={text}
                         onChange={(e) => {
@@ -264,6 +266,7 @@ const ExamHeaderForm: React.FC<ExamHeaderFormProps> = ({
                             </span>
                         </div>
                         <input
+                            aria-label="見出し枠の幅（px）"
                             type="range"
                             min={200}
                             max={1200}
@@ -288,6 +291,7 @@ const ExamHeaderForm: React.FC<ExamHeaderFormProps> = ({
                             </span>
                         </div>
                         <input
+                            aria-label="見出し枠の高さ（px）"
                             type="range"
                             min={24}
                             max={120}
@@ -454,6 +458,7 @@ const NameboxForm: React.FC<NameboxFormProps> = ({
                                 第1欄（年等）
                             </span>
                             <input
+                                aria-label="年組氏名欄 第1欄"
                                 type="text"
                                 value={labels[0]}
                                 onChange={(e) =>
@@ -468,6 +473,7 @@ const NameboxForm: React.FC<NameboxFormProps> = ({
                                 第2欄（組等）
                             </span>
                             <input
+                                aria-label="年組氏名欄 第2欄"
                                 type="text"
                                 value={labels[1]}
                                 onChange={(e) =>
@@ -482,6 +488,7 @@ const NameboxForm: React.FC<NameboxFormProps> = ({
                                 第3欄（番号等）
                             </span>
                             <input
+                                aria-label="年組氏名欄 第3欄"
                                 type="text"
                                 value={labels[2]}
                                 onChange={(e) =>
@@ -496,6 +503,7 @@ const NameboxForm: React.FC<NameboxFormProps> = ({
                                 第4欄（氏名等）
                             </span>
                             <input
+                                aria-label="年組氏名欄 第4欄"
                                 type="text"
                                 value={labels[3]}
                                 onChange={(e) =>
@@ -884,6 +892,10 @@ const QuestionBlockForm: React.FC<QuestionBlockFormProps> = ({
     const [splitRatio, setSplitRatio] = useState("50:50");
     const [splitHeight, setSplitHeight] = useState(38);
     const [blockWidth, setBlockWidth] = useState(SECTION_STANDARD_WIDTH);
+    const blockWidthMm = Math.round(
+        (Number(blockWidth) / PAPER_SIZES.B4_LANDSCAPE.widthPx) *
+            B4_LANDSCAPE_MM.width,
+    );
 
     const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
     const isInitialMountRef = useRef(true);
@@ -1103,6 +1115,9 @@ const QuestionBlockForm: React.FC<QuestionBlockFormProps> = ({
                     <h3 className="font-semibold text-slate-800 text-sm">
                         大問 {num || ""} のプロパティ
                     </h3>
+                    <p className="mt-0.5 text-[10px] text-slate-500">
+                        選択中の枠を直接編集
+                    </p>
                 </div>
                 <button
                     onClick={onClose}
@@ -1136,6 +1151,7 @@ const QuestionBlockForm: React.FC<QuestionBlockFormProps> = ({
                             </label>
                             <input
                                 type="text"
+                                aria-label="大問番号"
                                 value={num}
                                 onChange={(e) => {
                                     const val = e.target.value;
@@ -1155,6 +1171,7 @@ const QuestionBlockForm: React.FC<QuestionBlockFormProps> = ({
                             </label>
                             <input
                                 type="text"
+                                aria-label="配点注記"
                                 value={points}
                                 onChange={(e) => {
                                     const val = e.target.value;
@@ -1176,6 +1193,7 @@ const QuestionBlockForm: React.FC<QuestionBlockFormProps> = ({
                         </label>
                         <input
                             type="text"
+                            aria-label="指示文・観点名（rubric）"
                             value={rubric}
                             onChange={(e) => {
                                 const val = e.target.value;
@@ -1198,6 +1216,7 @@ const QuestionBlockForm: React.FC<QuestionBlockFormProps> = ({
                             <div className="flex items-center gap-1">
                                 <input
                                     type="number"
+                                    aria-label="大問の横幅（px）"
                                     min={QUESTION_BLOCK_WIDTH_LIMITS.min}
                                     max={QUESTION_BLOCK_WIDTH_LIMITS.max}
                                     step={4}
@@ -1218,10 +1237,14 @@ const QuestionBlockForm: React.FC<QuestionBlockFormProps> = ({
                                 <span className="text-slate-500 text-[10px]">
                                     px
                                 </span>
+                                <span className="text-slate-500 text-[10px]">
+                                    （約{blockWidthMm}mm）
+                                </span>
                             </div>
                         </div>
                         <input
                             type="range"
+                            aria-label="大問の横幅（px）"
                             min={QUESTION_BLOCK_WIDTH_LIMITS.min}
                             max={QUESTION_BLOCK_WIDTH_LIMITS.max}
                             step={4}
@@ -1238,6 +1261,7 @@ const QuestionBlockForm: React.FC<QuestionBlockFormProps> = ({
                             解答欄パターン
                         </label>
                         <select
+                            aria-label="解答欄パターン"
                             value={pattern}
                             onChange={(e) => {
                                 const newPattern = e.target
