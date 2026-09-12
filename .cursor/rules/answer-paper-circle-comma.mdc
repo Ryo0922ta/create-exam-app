@@ -1,0 +1,54 @@
+---
+description: 丸数字（circle_comma）パターンの確定描画仕様と設定フィールド
+globs: lib/editor/questionBlockBuilder.ts,components/editor/modals/QuestionEditModal.tsx,types/editor.ts
+alwaysApply: false
+---
+
+# Answer Paper Editor — 丸数字 `circle_comma`（WHAT）
+
+関連ルール: `answer-paper-editor-workflow.mdc`（Fabric / プレビュー同期手順）
+
+## レイアウト
+
+- フィールド: `circleRows`, `circleCols`, `circleHeight`（1行の高さ）
+- 後方互換: `cols = circleCols ?? circleCount`, `rows = circleRows ?? 1`
+- 保存時: `circleCount = rows × cols` も併記
+- 番号付け: **行優先** — `index = r * cols + c`（①②③ → ④⑤⑥ …）
+- ①〜⑮ 以降は `${index + 1}` フォールバック
+
+## 枠線（セル個別枠は使わない）
+
+1. **外枠1本**: `(0, tableTop, blockWidth, totalHeight)`
+2. **縦線**: `x = i * cellW`（`i = 1 .. cols-1`）、上端→下端
+3. **横線**: `y = tableTop + r * rowHeight`（`r = 1 .. rows-1`）、左端→右端
+
+`cellW = blockWidth / cols`, `totalHeight = rows * rowHeight`
+
+## テキスト配置
+
+- 丸数字: 小問複合枠同様 `x + tagW/2` 基準の左寄せ（Fabric `*9+12`, プレビュー `*10+12`）
+- 縦位置: 各セル内中央（`cell.y + rowHeight/2`）
+
+## カンマ（`,`）
+
+- `circleCommaEnabled` ON → **全セル**に `,` を表示
+- グループ分け・`,` 数指定・独立 comma スロットは **廃止**（`circleCommaCount` は描画で参照しない）
+- カンマ無効: `rows * cols <= 1`
+- 位置: `padding = max(5px, cellW × ratio)` → `commaX = cell.x + cellW - padding`
+
+## カンマ比率（列数ベース）
+
+- 補間キーは **列数 `circleCols`**（セル幅は列数で決まる）
+- 自動: `circleCommaPaddingAuto !== false`（デフォルト true）
+- 手動: `circleCommaPaddingRatio`（0〜1、UI は % 表示）
+- アンカー（cols → ratio）: 3→0.467, 4→0.492, 5→0.451, 6→0.443, 7→0.402（線形補間、8+ は外挿）
+
+## 主要関数（`questionBlockBuilder.ts`）
+
+- `resolveCircleRowsCols`, `buildCircleCommaLayout`
+- `resolveCircleCommaPaddingRatio`, `resolveCircleCommaRightPadding`
+
+## 変更してはいけないこと
+
+- セルごとの `strokeRect` / `fabric.Rect` 外枠に戻さない（カンマ左右に余計な縦線が出る）
+- カンマ位置を固定 px のみで指定しない（比率方式を維持）

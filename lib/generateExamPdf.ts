@@ -2,8 +2,11 @@ import { NumberedQuestion } from "@/types/exam";
 import { LayoutSettings } from "@/types/layout";
 import { Question } from "@/types/question";
 
+export type PdfDownloadTarget = "all" | "question" | "answer";
+
 type GenerateExamPdfOptions = {
     fileName: string | null;
+    target?: PdfDownloadTarget;
     previewQuestions: NumberedQuestion[];
     choiceQuestions: Question[];
     wordQuestions: Question[];
@@ -12,8 +15,20 @@ type GenerateExamPdfOptions = {
     layout: LayoutSettings;
 };
 
+function triggerDownload(blob: Blob, fileName: string) {
+    const downloadUrl = URL.createObjectURL(blob);
+    const downloadLink = document.createElement("a");
+    downloadLink.href = downloadUrl;
+    downloadLink.download = fileName;
+    document.body.appendChild(downloadLink);
+    downloadLink.click();
+    document.body.removeChild(downloadLink);
+    URL.revokeObjectURL(downloadUrl);
+}
+
 export async function generateExamPdf({
     fileName,
+    target = "all",
     previewQuestions,
     choiceQuestions,
     wordQuestions,
@@ -21,15 +36,40 @@ export async function generateExamPdf({
     displayNumbers,
     layout,
 }: GenerateExamPdfOptions) {
-    const [
-        { pdf },
-        { PDFDocument },
-        { QuestionSheetDocument, AnswerSheetDocument },
-    ] = await Promise.all([
-        import("@react-pdf/renderer"),
-        import("pdf-lib"),
-        import("@/components/pdfDocuments"),
-    ]);
+    const [{ pdf }, { QuestionSheetDocument, AnswerSheetDocument }] =
+        await Promise.all([
+            import("@react-pdf/renderer"),
+            import("@/components/pdfDocuments"),
+        ]);
+
+    const baseName = fileName?.replace(/\.csv$/i, "") || "試験";
+
+    // 問題用紙のみ
+    if (target === "question") {
+        const questionBlob = await pdf(
+            QuestionSheetDocument({ questions: previewQuestions }),
+        ).toBlob();
+        triggerDownload(questionBlob, `${baseName}-問題用紙.pdf`);
+        return;
+    }
+
+    // 解答用紙のみ
+    if (target === "answer") {
+        const answerBlob = await pdf(
+            AnswerSheetDocument({
+                choiceQuestions,
+                wordQuestions,
+                essayQuestions,
+                displayNumbers,
+                layout,
+            }),
+        ).toBlob();
+        triggerDownload(answerBlob, `${baseName}-解答用紙.pdf`);
+        return;
+    }
+
+    // 全部（問題用紙 + 解答用紙）
+    const [{ PDFDocument }] = await Promise.all([import("pdf-lib")]);
 
     const [questionBlob, answerBlob] = await Promise.all([
         pdf(QuestionSheetDocument({ questions: previewQuestions })).toBlob(),
@@ -62,12 +102,6 @@ export async function generateExamPdf({
     const mergedBlob = new Blob([mergedBuffer], {
         type: "application/pdf",
     });
-    const downloadUrl = URL.createObjectURL(mergedBlob);
-    const downloadLink = document.createElement("a");
-    const baseName = fileName?.replace(/\.csv$/i, "") || "解答用紙";
 
-    downloadLink.href = downloadUrl;
-    downloadLink.download = `${baseName}-問題・解答用紙.pdf`;
-    downloadLink.click();
-    URL.revokeObjectURL(downloadUrl);
+    triggerDownload(mergedBlob, `${baseName}-問題・解答用紙.pdf`);
 }

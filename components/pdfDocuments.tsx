@@ -91,11 +91,15 @@ const styles = StyleSheet.create({
     gridItem: {
         padding: 3,
     },
+    wordGridItem: {
+        paddingTop: 3,
+        paddingBottom: 3,
+        paddingLeft: 4,
+        paddingRight: 4,
+    },
     choiceAnswer: {
         minHeight: 55,
-        borderWidth: 1,
-        borderColor: "#000000",
-        padding: 7,
+        padding: 4,
     },
     choiceBox: {
         height: 30,
@@ -201,13 +205,17 @@ export function QuestionSheetDocument({
     );
 }
 
+type PdfStyle = Parameters<typeof StyleSheet.create>[0][string];
+
 function AnswerGrid({
     questions,
     columns,
+    itemStyle,
     children,
 }: {
     questions: Question[];
     columns: number;
+    itemStyle?: PdfStyle | PdfStyle[];
     children: (question: Question) => React.ReactNode;
 }) {
     return (
@@ -215,7 +223,11 @@ function AnswerGrid({
             {questions.map((question) => (
                 <View
                     key={question.id}
-                    style={[styles.gridItem, { width: `${100 / columns}%` }]}
+                    style={[
+                        styles.gridItem,
+                        itemStyle,
+                        { width: `${100 / columns}%` },
+                    ]}
                     wrap={false}
                 >
                     {children(question)}
@@ -269,6 +281,7 @@ export function AnswerSheetDocument({
                         <AnswerGrid
                             questions={wordQuestions}
                             columns={layout.word.columns}
+                            itemStyle={styles.wordGridItem}
                         >
                             {(question) => (
                                 <View style={styles.wordAnswer}>

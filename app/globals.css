@@ -6,3 +6,28 @@ body {
     color: #1f2937;
     background-color: #f9fafb;
 }
+
+/* 方眼グリッド背景（5mmマス・CSS変数は AnswerSheetCanvasEditor で設定） */
+.grid-active {
+    background-size:
+        var(--grid-cell-x) var(--grid-cell-y),
+        var(--grid-cell-x) var(--grid-cell-y),
+        var(--grid-major-x) var(--grid-major-y),
+        var(--grid-major-x) var(--grid-major-y) !important;
+    background-image:
+        linear-gradient(to right, #f1f5f9 1px, transparent 1px),
+        linear-gradient(to bottom, #f1f5f9 1px, transparent 1px),
+        linear-gradient(to right, #cbd5e1 1.2px, transparent 1.2px),
+        linear-gradient(to bottom, #cbd5e1 1.2px, transparent 1.2px) !important;
+}
+
+.canvas-container {
+    margin: 0 auto;
+    background-color: transparent !important;
+}
+
+.canvas-shadow {
+    box-shadow:
+        0 10px 30px -5px rgba(0, 0, 0, 0.25),
+        0 0 0 1px rgba(0, 0, 0, 0.08);
+}

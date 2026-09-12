@@ -1,12 +1,28 @@
 # 解答用紙作成アプリ 技術仕様書
 
-## 1. システム概要
+関連ドキュメント:
 
-### 1.1 アーキテクチャの概要
+- [利用ガイド](./USER_GUIDE.md) — 操作手順（利用者向け）
+- [業務フロー](./BUSINESS_WORKFLOW.md) — 機能間関係・データの流れ（開発者向け）
 
-Next.js App Router、React、TypeScript、Tailwind CSSで構築したブラウザ完結型のクライアントサイドSPA（Single Page Application）です。CSVファイルの解析、状態管理、プレビュー描画、PDFの生成および結合ダウンロードに至るすべての処理をブラウザ上で実行します。サーバーへのデータ送信は行いません。
+本アプリは **2つの独立機能** で構成される。いずれもブラウザ完結型のクライアントサイド処理であり、サーバーへのデータ送信は行わない。
 
-### 1.2 使用技術スタック
+| 機能 | ルート | 主な技術 |
+|------|--------|----------|
+| Part A: CSV 試験用紙ジェネレータ | `/` | PapaParse, `@react-pdf/renderer`, pdf-lib |
+| Part B: 解答用紙キャンバスエディタ | `/editor` | Fabric.js, pdf-lib, docx |
+
+トップページ（`app/page.tsx`）から `/editor` へのリンクでエディタへ遷移できる。
+
+---
+
+# Part A: CSV 試験用紙ジェネレータ
+
+## A.1 システム概要
+
+Next.js App Router、React、TypeScript、Tailwind CSSで構築。CSVファイルの解析、状態管理、プレビュー描画、PDFの生成および結合ダウンロードをブラウザ上で実行する。
+
+## A.2 使用技術スタック
 
 - **フロントエンドフレームワーク**: Next.js (App Router), React
 - **プログラミング言語**: TypeScript
@@ -14,225 +30,345 @@ Next.js App Router、React、TypeScript、Tailwind CSSで構築したブラウ�
 - **CSV解析**: PapaParse
 - **PDF生成・結合**: @react-pdf/renderer, pdf-lib
 
-## 2. ディレクトリ・モジュール構造
+## A.3 ディレクトリ・モジュール構造
 
-### 2.1 主要ファイルとコンポーネントの責務一覧
+### UIコンポーネント
 
-#### UIコンポーネント
+| ファイル | 責務 |
+| -------- | ---- |
+| `app/page.tsx` | メインページ。CSV取込・プレビュー・編集・同期・PDF/CSV出力の統括 |
+| `components/CsvUploader.tsx` | CSVファイルの選択、D&D、リセット |
+| `components/LayoutSettingsModal.tsx` | レイアウト設定（問題数・行数・列数） |
+| `components/PreviewPanel.tsx` | タブ切替、同期・CSV出力・PDF対象選択、問題用紙・解答用紙プレビュー |
+| `components/QuestionPaperPreview.tsx` | 問題用紙プレビューのHTML描画（インライン編集対応） |
+| `components/AnswerSheetPreview.tsx` | 解答用紙プレビューのHTML描画 |
 
-| ファイル                              | 責務                                                                           |
-| ------------------------------------- | ------------------------------------------------------------------------------ |
-| `app/page.tsx`                        | メインページ。画面全体の状態管理とイベントハンドリング、各コンポーネントの統括 |
-| `components/CsvUploader.tsx`          | CSVファイルの選択、ドラッグ&ドロップ、ファイル名表示、リセット操作             |
-| `components/LayoutSettingsModal.tsx`  | レイアウト設定（問題数・行数・列数）のモーダル入力と検証エラー表示             |
-| `components/PreviewPanel.tsx`         | タブ切替、プレビュー操作、問題用紙・解答用紙プレビューの切替                   |
-| `components/QuestionPaperPreview.tsx` | 問題用紙プレビューのHTML描画                                                   |
-| `components/AnswerSheetPreview.tsx`   | 解答用紙プレビューのHTML描画                                                   |
+### データ処理・ヘルパー
 
-#### データ処理・ヘルパー
+| ファイル | 責務 |
+| -------- | ---- |
+| `types/question.ts` | 問題形式・Question 判別可能ユニオン |
+| `types/layout.ts` | 問題形式ごとのレイアウト型 |
+| `types/exam.ts` | 試験プレビュー・displayNumber 型 |
+| `utils/csvParser.ts` | 文字コード判定、CSVパース・バリデーション、CSVエクスポート |
+| `lib/examLayout.ts` | 形式別抽出、連番採番、レイアウト検証 |
 
-| ファイル             | 責務                                                          |
-| -------------------- | ------------------------------------------------------------- |
-| `types/question.ts`  | CSV行データ、問題形式、問題ドメインモデルの型定義             |
-| `types/layout.ts`    | 問題形式ごとの表示件数・横・縦のレイアウト型定義              |
-| `types/exam.ts`      | 問題グループと表示番号を含む試験プレビュー共有型定義          |
-| `utils/csvParser.ts` | 文字コード判定、CSVパース、バリデーション、問題データへの変換 |
-| `lib/examLayout.ts`  | 問題の形式別抽出、表示番号採番、レイアウト設定の初期化・検証  |
+### PDF生成
 
-#### PDF生成ロジック
+| ファイル | 責務 |
+| -------- | ---- |
+| `lib/generateExamPdf.ts` | 動的インポート、PDF並列生成、結合、ダウンロード（出力対象選択） |
+| `components/pdfDocuments.tsx` | @react-pdf/renderer による問題用紙・解答用紙レイアウト |
 
-| ファイル                      | 責務                                                                            |
-| ----------------------------- | ------------------------------------------------------------------------------- |
-| `lib/generateExamPdf.ts`      | PDF生成エンジン。動的インポート、PDF並列生成、結合、Blobダウンロード            |
-| `components/pdfDocuments.tsx` | `@react-pdf/renderer` を用いた問題用紙・解答用紙PDFドキュメントのレイアウト定義 |
+## A.4 データモデル
 
-## 3. データ構造（データモデル）
-
-### 3.1 問題データモデル（Question 判別可能ユニオン）
-
-`Question` は問題形式を `type` プロパティで識別する判別可能ユニオン（Discriminated Union）です。
+### Question（判別可能ユニオン）
 
 ```ts
 type QuestionType = "4択" | "単語" | "自由記述";
-
-type ChoiceQuestion = {
-    id: number;
-    type: "4択";
-    question: string;
-    choices: [string, string, string, string];
-};
-
-type WordQuestion = {
-    id: number;
-    type: "単語";
-    question: string;
-};
-
-type EssayQuestion = {
-    id: number;
-    type: "自由記述";
-    question: string;
-    maxChars?: number;
-};
-
 type Question = ChoiceQuestion | WordQuestion | EssayQuestion;
 ```
 
-### 3.2 レイアウト設定モデル（LayoutSettings）
+### LayoutSettings
 
-各問題形式における「出力件数（count）」「列数（columns）」「行数（rows）」を管理します。
+各形式の `count`（出力件数）、`columns`（横）、`rows`（縦）を管理。
 
-```ts
-type QuestionLayout = {
-    count: number;
-    columns: number;
-    rows: number;
-};
+### NumberedQuestion / QuestionGroups
 
-type LayoutSettings = {
-    choice: QuestionLayout;
-    word: QuestionLayout;
-    essay: QuestionLayout;
-};
-```
+元CSVのIDとは別に `displayNumber` を付与。問題用紙・解答用紙・PDFで同一番号を参照。
 
-### 3.3 試験プレビュー・連番管理モデル（NumberedQuestion）
-
-元CSVのIDとは別に、試験全体で通し番号（displayNumber）を付与して問題を管理します。
+### PdfDownloadTarget
 
 ```ts
-type NumberedQuestion = {
-    question: Question;
-    displayNumber: number;
-};
-
-type QuestionGroups = {
-    choice: NumberedQuestion[];
-    word: NumberedQuestion[];
-    essay: NumberedQuestion[];
-};
+type PdfDownloadTarget = "all" | "question" | "answer";
 ```
 
-## 4. データ処理仕様
+## A.5 状態管理
 
-### 4.1 CSV解析と自動判定
+`app/page.tsx` で管理する主要状態:
 
-- **文字コード判定（UTF-8 / Shift-JIS）**: `decodeCsvFile()` は最初にUTF-8として厳密（fatal: true）にデコードし、失敗した場合のみShift-JISとして再デコードします。
-- **問題形式の自動正規化**:
-    - `単語`、`語句`、`一問一答` → 単語回答（`"単語"`）へ正規化
-    - `自由記述`、`記述`、`論述` → 自由記述（`"自由記述"`）へ正規化
-    - 未指定または未知の値 → 4択（`"4択"`）としてフォールバック
-    - 自由記述の文字数制限は、正の整数として解釈できる場合のみ保存
-- **バリデーションとエラーの非表示処理**:
-    - `問題番号` と `問題文` の必須存在チェック
-    - 問題番号が数値であること、問題文が空でないことの検証
-    - PapaParse解析時の末尾の空列などに起因する `TooFewFields`、`TooManyFields` をエラー表示から除外
+| 状態 | 説明 |
+|------|------|
+| `questions` | 現在の問題データ（プレビュー編集を反映） |
+| `originalQuestions` | CSVアップロード直後のスナップショット |
+| `syncedQuestions` | 解答用紙プレビュー・PDF解答用紙に反映済みの問題データ |
+| `appliedSettings` | 確定済みレイアウト設定 |
+| `isEdited` | `questions !== originalQuestions` |
+| `hasUnsyncedChanges` | `questions !== syncedQuestions` |
 
-### 4.2 状態管理と連番（displayNumber）の生成
+**問題用紙と解答用紙の分離:**
 
-- **問題用紙・解答用紙間の表示番号同期アルゴリズム**:
-    1. CSVから得た全問題を形式別（choice, word, essay）に分類します。
-    2. `appliedSettings` の各 `count` に応じて各形式から問題を抽出します。
-    3. 抽出された全問題を元CSVの `id` 昇順に並べ替え、1から昇順に通し番号 `displayNumber` を採番します。
-    4. 問題用紙、解答用紙、PDFの各レンダラーが同一の `NumberedQuestion` / `displayNumbers` マップを参照することで、すべての用紙間で問題番号が完全に一致します。
-- **レイアウト境界条件の検証ルール**:
-  設定変更・確定時に、各形式について以下の条件を検証します。
-    - `count <= CSV内の該当問題数`（CSVに存在する問題数を超えて指定できない）
-    - `columns * rows >= count`（指定したグリッド枠数以上に出力件数が収まっていること）
+- 問題用紙プレビュー・PDF（問題用紙）は `questions`（＋`createExamPreview(questions, ...)`）を参照
+- 解答用紙プレビュー・PDF（解答用紙）は `syncedQuestions` を参照
+- 問題用紙を編集した後、ユーザーが「解答用紙に同期」を実行すると `syncedQuestions ← questions`
 
-### 4.3 エラー状態の保持と隔離
+## A.6 CSV解析とレイアウト検証
 
-エラーの種類に応じて独立した状態を管理し、操作による誤消去や混同を防止します。
+- UTF-8 厳密デコード失敗時のみ Shift-JIS 再デコード
+- 問題形式の正規化（単語/語句/一問一答 → `"単語"` 等）
+- `columns * rows >= count` のレイアウト検証
+- エラー状態: `csvErrors`, `pdfError`, `settingsError` を独立管理
 
-- `csvErrors`: CSVの解析・バリデーションエラー
-- `pdfError`: PDF生成処理時のエラー
-- `settingsError`: レイアウト設定モーダルでの検証エラー
+## A.7 プレビュー編集・同期・エクスポート
 
-※ PDF生成を試行しても `csvErrors` は維持され、独立してユーザーへ通知されます。
+### 問題用紙プレビュー編集
 
-## 5. PDF生成・結合エンジン
+- `QuestionPaperPreview` → `onUpdateQuestion(id, partial)` で問題文・選択肢等をインライン編集
+- 編集は `questions` に即時反映（解答用紙には自動反映されない）
 
-### 5.1 生成フローと動的ローディング
+### 解答用紙への同期
 
-初期バンドルサイズを削減するため、`@react-pdf/renderer`、`pdf-lib`、およびPDF用コンポーネントはPDFダウンロードの実行時にのみ `import()` で動的読み込みを行います。
+- `handleSyncToAnswerSheet()` — `syncedQuestions` を `questions` の内容で更新
+- `hasUnsyncedChanges` が true のときのみ「解答用紙に同期」ボタンが有効
 
-1. ユーザーがPDFダウンロードをクリックします。
-2. 必要なライブラリとPDFコンポーネントを動的ロードします。
-3. `QuestionSheetDocument` と `AnswerSheetDocument` を並列にBlobとしてレンダリングします。
+### CSV再エクスポート
 
-### 5.2 問題用紙・解答用紙の独立生成と結合（pdf-lib）
+- `exportQuestionsToCsv(questions, fileName)` — 編集後の `questions` を CSV としてダウンロード
 
-- `pdf-lib` の `PDFDocument.load()` を使用して、問題用紙Blobと解答用紙Blobを別々に読み込みます。
-- 新規の `PDFDocument` を作成し、`copyPages()` で問題用紙の全ページ、続いて解答用紙の全ページの順に結合します。
-- 生成したバイト列をBlob化し、一時オブジェクトURLを発行してブラウザから自動ダウンロードします。
-- ダウンロード開始後にオブジェクトURLを安全に解放します。
+### 編集のリセット
 
-### 5.3 用紙別独立ページナンバリング仕様
+- `handleResetQuestions()` — `questions` と `syncedQuestions` を `originalQuestions` に戻す
 
-問題用紙と解答用紙を別々のドキュメントとして生成してから結合するため、それぞれのフッターに表示されるページ番号（例: `1 / 2`）は各用紙の総ページ数を参照します。結合後も用紙をまたいでページ番号が通しになることはなく、問題用紙は「問題用紙の総ページ」、解答用紙は「解答用紙の総ページ」として独立してナンバリングされます。
+## A.8 PDF生成・結合
 
-### 5.4 レイアウト制御（Flexbox配置と改ページ抑制 wrap={false}）
+1. 動的 `import()` で @react-pdf/renderer / pdf-lib をロード
+2. `target` に応じて生成ページを選択:
+   - `all`: 問題用紙 + 解答用紙を結合
+   - `question`: 問題用紙のみ
+   - `answer`: 解答用紙のみ（`syncedQuestions` ベース）
+3. pdf-lib で結合し1ファイルダウンロード
+4. 問題用紙・解答用紙のページ番号は独立ナンバリング
 
-- **Flexbox配置**: `@react-pdf/renderer` はCSS Gridをサポートしないため、解答用紙のマス目はFlexboxの折り返し（`flexWrap: 'wrap'`）と `columns` から動的に算出した幅（例: 2列なら `50%`、3列なら `33.33%`）で均等配置します。
-- **改ページ抑制**: 各問題ブロックおよび各解答欄コンポーネントに `wrap={false}` を指定し、枠の途中での不自然な改ページを抑止します。
+## A.9 フォント・ライセンス
 
-## 6. アセット・ライセンス管理
+- `public/fonts/NotoSansJP-Regular.otf` を PDF に埋め込み
+- ライセンス: `public/fonts/OFL.txt`
 
-### 6.1 フォント埋め込み仕様（NotoSansJP-Regular.otf）
+## A.10 既知の制約（Part A）
 
-- 日本語フォントとして `public/fonts/NotoSansJP-Regular.otf` を `NotoSansJP` ファミリとして登録します。
-- PDF生成時にフォントデータをバイナリ埋め込みするため、macOS/Windows/iOS/Android等の環境差異に関わらず文字化けせず正確に日本語を描画します。
+- CSV内 ID 重複時の検証なし（後勝ち上書き）
+- 改ページ位置は @react-pdf/renderer のレンダリング結果に依存
+- 大量問題時はクライアント側で数秒の処理時間を要する場合あり
+- Part B（エディタ）とのデータ連携なし
 
-### 6.2 ライセンスと静的配信管理（public/）
+---
 
-- フォントのライセンス文書は `public/fonts/OFL.txt`（SIL Open Font License）にて管理します。
-- `public/` ディレクトリから静的アセットとして配信し、差し替え時もライセンス文書とセットで管理します。
+# Part B: 解答用紙キャンバスエディタ
 
-## 7. 外部依存関係（外部ライブラリ）
+## B.1 概要
 
-### 7.1 利用パッケージと使用目的
+B4横（364×257mm）サイズの Fabric.js キャンバス上で、大問ブロック・基本パーツを配置し、PDF / Word で出力するビジュアルエディタ。
 
-| パッケージ            | 用途                                                                  |
-| --------------------- | --------------------------------------------------------------------- |
-| `papaparse`           | CSVファイルの解析、ヘッダーマッピング                                 |
-| `@react-pdf/renderer` | ReactコンポーネントからのクライアントサイドPDF生成                    |
-| `pdf-lib`             | 生成された複数のPDFドキュメント（問題用紙・解答用紙）の読み込みと結合 |
+- エントリ: `app/editor/page.tsx` → `AnswerSheetCanvasEditor`（`dynamic` + `ssr: false`）
+- 状態はセッション内のみ（永続化・サーバー保存なし）
+- Part A（CSV ジェネレータ）とのデータ連携は現状なし
 
-## 8. 既知の制約事項・制限仕様
+## B.2 追加技術スタック
 
-### 8.1 ID重複時の挙動
+| パッケージ | 用途 |
+| ---------- | ---- |
+| `fabric` | キャンバス上のオブジェクト描画・ドラッグ |
+| `docx` | Word (.docx) 出力 |
+| `pdf-lib` | Canvas 画像の PDF 埋め込み |
 
-CSV内の問題番号（ID）が重複している場合のエラー検証は行われません。表示番号マップ作成時、同一IDが存在すると後勝ちで上書きされます。
+## B.3 ディレクトリ構造
 
-### 8.2 レンダリング依存の改ページ仕様
+| パス | 責務 |
+| ---- | ---- |
+| `components/editor/AnswerSheetCanvasEditor.tsx` | Fabric 初期化、イベント、エクスポート、モーダル・サイドパネル統括 |
+| `components/editor/EditorToolbar.tsx` | ツールバー UI（方眼・吸着・配置ガイド・余白ガイド・ズーム） |
+| `components/editor/QuestionBlockPropertyPanel.tsx` | 選択ブロックのプロパティ編集サイドパネル |
+| `components/editor/modals/QuestionEditModal.tsx` | 大問の新規作成（リアルタイムプレビュー付き） |
+| `components/editor/modals/ImportTextModal.tsx` | 問題文から小問記号を自動抽出 |
+| `components/editor/modals/BatchReplaceModal.tsx` | 観点記号の一括置換 |
+| `lib/editor/questionBlockBuilder.ts` | 大問ブロック生成（Fabric + モーダルプレビュー） |
+| `lib/editor/basicPartBuilder.ts` | 基本パーツ（考査見出し枠・年組氏名欄・観点別得点枠）ブロック生成 |
+| `lib/editor/fabricBlocks.ts` | 短答欄・記述欄等の汎用 Fabric ブロック |
+| `lib/editor/alignmentGuides.ts` | ドラッグ中の配置ガイド・吸着 |
+| `lib/editor/marginGuides.ts` | 余白ガイド線・有効配置領域の算出 |
+| `lib/editor/exportPdf.ts` | B4横 / A4分割 PDF 出力 |
+| `lib/editor/exportWord.ts` | Word docx 出力 |
+| `lib/editor/paperSizes.ts` | 用紙サイズ・方眼・大問横幅定数 |
+| `lib/editor/symbolParser.ts` | 問題文から小問記号を抽出 |
+| `types/editor.ts` | エディタ用型定義 |
+| `.cursor/rules/` | AI 向けプロジェクトルール（描画仕様・ワークフロー） |
 
-`rows` の設定値はレイアウト設定時の容量検証（`columns * rows >= count`）に使用されます。実際のPDF上での改ページ位置は、問題文の長さやフォントのレンダリング結果に基づき `@react-pdf/renderer` が動的に決定します。
+## B.4 Fabric アーキテクチャ
 
-### 8.3 クライアントサイド生成におけるパフォーマンス制限
+- React は `<canvas>` 要素を直接管理しない。`.fabric-canvas-host` div に Fabric をマウント
+- 方眼グリッドは `app/globals.css` の `.fabric-canvas-host.grid-active` でホスト側に描画
+  - 1マス = `GRID_CELL_MM`（5mm）、`getGridCellSizePx()` で px 換算
+  - 太線方眼: `GRID_MAJOR_CELL_COUNT = 5`（25mm ごと）
+  - CSS 変数 `--grid-cell-x/y`, `--grid-major-x/y` はズームに追従
+- ズームは `canvas.setZoom()` で制御し、表示サイズと内部解像度を分離
 
-PDF生成処理（レイアウト計算、フォント埋め込み、結合）はすべてクライアントのブラウザ（JavaScriptメインスレッド）上で動作します。問題数や文字数が多い場合、生成完了まで数秒程度の処理時間を要する場合があります。
+## B.5 描画の二重化（必須原則）
 
-## 9. 品質検証（テスト手順）
+大問ブロックの見た目変更時は **両方** を同じルールで更新する。
 
-### 9.1 ビルド・型チェック検証
+| 用途 | 関数 | 出力先 |
+| ---- | ---- | ------ |
+| 用紙 canvas | `createQuestionBlock()` | Fabric Group |
+| モーダルプレビュー（新規作成時） | `drawModalPreviewCanvas()` | HTML5 Canvas 2D |
+
+既存大問の編集はプロパティパネル経由で canvas 上を直接再生成する（モーダルプレビューは使用しない）。
+
+## B.6 データモデル
+
+### QuestionBlockConfig（大問ブロック）
+
+| フィールド | 説明 |
+| ---------- | ---- |
+| `num`, `rubric`, `points` | 大問番号、観点区分、配点表示 |
+| `pattern` | 解答枠パターン（下表） |
+| `subRows/Cols/RowHeight/subLabels` | 小問複合枠用 |
+| `gridRows/Cols/RowHeight` | 等分割グリッド用 |
+| `circleRows/Cols/Height/circleCount` | 丸数字区分用（`circleCount = rows × cols` で後方互換） |
+| `circleCommaEnabled` | 全セルに `,` を表示 |
+| `circleCommaPaddingAuto/Ratio` | カンマ位置の自動/手動比率 |
+| `splitRatio/splitHeight` | 左右2分割枠用 |
+| `blockWidth` | 大問ブロック全体の横幅（px、200–1200、未指定時 630） |
+
+### EditorBlockType / 基本パーツ設定型
+
+```ts
+type EditorBlockType = "question-block" | "exam-header" | "namebox" | "score-table";
+
+interface ExamHeaderConfig { text: string; width: number; height: number; }
+interface NameboxConfig { width: number; height: number; labels: [string, string, string, string]; }
+interface ScoreTableConfig { width: number; height: number; colHeaders: [string, string, string]; maxScores: [string, string, string]; }
+```
+
+### PaperMargins（余白ガイド）
+
+```ts
+interface PaperMargins {
+  verticalMm: number;        // 上下余白
+  outerHorizontalMm: number; // 用紙外端（左端・右端）
+  foldHorizontalMm: number;  // 中央折り目内側
+}
+```
+
+- 既定値: `DEFAULT_PAPER_MARGINS` — vertical 10mm, outer 10mm, fold 5mm
+- 制限: `MARGIN_LIMITS` — vertical 5–25mm, outer 5–20mm, fold 5–20mm
+
+### 解答枠パターン（pattern）
+
+| 値 | UI名称 | 概要 |
+| --- | ------ | ---- |
+| `sub_parens` | (1)(2) 小問複合枠 | 行×列、小問ラベル付き |
+| `grid` | 等分割グリッド | 行×列の空マス |
+| `circle_comma` | 丸数字区分 | ①②③…、`,` 区切りオプション |
+| `split_2` | 左右2分割枠 | 50:50 / 30:70 / 70:30 |
+
+### Fabric Group が保持する設定
+
+| customType | 保持フィールド | 生成関数 |
+|------------|---------------|----------|
+| `question-block` | `questionConfig` | `createQuestionBlock()` |
+| `exam-header` | `examHeaderConfig` | `createExamHeaderBlock()` |
+| `namebox` | `nameboxConfig` | `createNameboxBlock()` |
+| `score-table` | `scoreTableConfig` | `createScoreTableBlock()` |
+
+## B.7 編集フロー（新規 vs 既存）
+
+| 操作 | UI | 処理 |
+|------|-----|------|
+| 大問の新規作成 | 「大問を作成・追加」→ `QuestionEditModal` | モーダルプレビュー + 確定時 `createQuestionBlock` |
+| 大問の既存編集 | 選択 → ツールバー「プロパティ」→ `QuestionBlockPropertyPanel` | `replaceSelectedBlock` で座標維持・再生成 |
+| 基本パーツ編集 | 選択 → 「プロパティ」 | 同上（各 builder 関数で再生成） |
+| 問題文インポート | `ImportTextModal` | 記号抽出 → 小問複合枠の大問を新規追加 |
+
+プロパティパネルの更新挙動:
+
+- 数値・スライダー変更: 即時再生成
+- テキスト入力: 300ms デバウンス + blur 時即時確定
+- パネル閉じる: 選択は維持。選択解除で自動クローズ
+
+## B.8 丸数字（circle_comma）描画仕様
+
+- レイアウト: `buildCircleCommaLayout()` — `cellW = blockWidth / cols`, `totalHeight = rows × rowHeight`
+- 番号付け: 行優先 `index = r * cols + c`（①〜⑮、以降は数値フォールバック）
+- 枠線: **外枠1本** + 列間縦線（`cols - 1`）+ 行間横線（`rows - 1`）。セル個別枠は使わない
+- カンマ: `padding = max(5px, cellW × ratio)`。比率は **列数** をキーにアンカー補間（3→0.467 … 7→0.402）
+- 後方互換: `circleCols ?? circleCount`, `circleRows ?? 1`
+
+## B.9 配置ガイド・余白ガイド
+
+### 配置ガイド（alignmentGuides.ts）
+
+- ドラッグ中: rose 色破線（`#f43f5e`）で余白内側・折り目内側・他オブジェクト整列位置を表示
+- 3点以上の等分配置スナップ: 左/右 A4 面（横）・全幅（縦）で gap 等分
+- 吸着: `getGridCellSizePx('x'/'y')`（5mm 相当）ベース + ガイド位置への吸着
+- エクスポート時: `stripAlignmentGuidesForExport()` で Fabric 上のガイド線を一時除去
+
+### 余白ガイド（marginGuides.ts）
+
+- `computeMarginGuideLines()` — mm → px 換算で外端4本 + 折り目内側2本 + 上下2本
+- 表示: HTML オーバーレイ（amber 点線）。PDF/Word には含まれない
+- `computeMarginRegions()` — 左/右 A4 面の有効配置領域を算出し、配置ガイドの吸着に利用
+- ツールバー: 「余白ガイド」ON + スライダー（上下 / 外側 / 折り目）
+
+## B.10 用紙サイズ
+
+| 定数 | 値 |
+| ---- | --- |
+| デフォルト用紙 | B4横 1376×972 px |
+| 大問ブロック標準幅 | `SECTION_STANDARD_WIDTH = 630` px |
+| 大問横幅制限 | `QUESTION_BLOCK_WIDTH_LIMITS` — min 200, max 1200 |
+| 方眼1マス | `GRID_CELL_MM = 5` mm |
+| 方眼スナップ | `getGridCellSizePx('x'/'y')` |
+
+## B.11 エクスポート
+
+### PDF（exportPdf.ts）
+
+1. `getCleanCanvasDataUrl()` — 選択解除、配置ガイド除去、方眼 OFF、zoom=1、白背景、multiplier=2 で PNG 化
+2. **B4横 PDF** — 1ページに全 canvas を embed
+3. **A4分割 PDF** — canvas 左半/右半をそれぞれ A4 1ページに embed（計2ページ）
+
+余白ガイドは HTML オーバーレイのため、エクスポート処理の対象外（最初から canvas に含まれない）。
+
+### Word（exportWord.ts）
+
+- canvas を PNG 化し docx に埋め込み（ラスターベース）
+
+## B.12 その他 Fabric オブジェクト
+
+`fabricBlocks.ts` で定義される汎用ブロック（`customType` 例）:
+
+- `短答欄`, `年組氏名・得点欄`, `タイトル`, `記述欄(N行)`, `マス目(N字)`, `端数セル`
+
+## B.13 既知の制約（Part B）
+
+- レイアウトデータの保存/読込機能なし（リロードで初期状態に戻る）
+- PDF/Word は画像ベースのため、テキスト選択・再編集不可
+- A4分割 PDF は B4横 canvas の左右半分を切り出す方式（折り目位置固定）
+
+---
+
+## 品質検証
 
 ```bash
 npm run build
 ```
 
-TypeScriptの型チェック、ESLint、Next.jsの静的生成がエラーなく完了することを確認します。
+TypeScript 型チェック、ESLint、Next.js 静的生成がエラーなく完了することを確認する。
 
-### 9.2 画面表示・レイアウト変更検証
+### Part A 検証
 
-1. `public/sample-questions.csv` をアップロードし、4択・単語・自由記述の各問題が正しくプレビューされることを確認します。
-2. 問題用紙プレビューと解答用紙プレビューで問題の通し番号（1〜N）が一致していることを確認します。
-3. レイアウト設定モーダルを開き、問題数・列数・行数を変更して容量バリデーション（`columns * rows >= count`）が機能することを確認します。
-4. 設定確定後、解答用紙プレビューの列数が正しく反映されることを確認します。
+1. `public/sample-questions.csv` をアップロードし各問題形式がプレビューされること
+2. 問題用紙プレビューで問題文を編集し、「解答用紙に同期」後に解答用紙へ反映されること
+3. 問題用紙・解答用紙の通し番号が一致すること（同期後）
+4. PDF 対象選択（全部 / 問題のみ / 解答のみ）が正常に動作すること
+5. CSV エクスポートで編集内容が出力されること
 
-### 9.3 クロスブラウザ・出力PDF検証
+### Part B 検証
 
-1. 「PDFダウンロード」ボタンをクリックし、問題用紙と解答用紙が結合された単一のPDFが正常に保存されることを確認します。
-2. macOS（Chrome, Safari）およびWindows（Chrome, Edge）で生成PDFを開き、以下を確認します：
-    - 日本語の文字化けがないこと（Noto Sans JPの埋め込み確認）
-    - 問題用紙・解答用紙それぞれのページ番号（独立ナンバリング）が正しく表示されていること
-    - 解答欄の枠組みが途中で改ページにより分断されていないこと
+1. `/editor` で初期サンプル大問が表示・ドラッグできること
+2. 大問を選択しプロパティパネルで編集後、canvas の見た目が更新されること
+3. 新規大問作成モーダルのプレビューと canvas の見た目が一致すること
+4. 余白ガイド ON/OFF・スライダー変更が表示に反映されること
+5. B4横 PDF / A4分割 PDF / Word docx がダウンロードできること
+6. 配置ガイド ON 時、エクスポート PDF にガイド線が含まれないこと
+7. 余白ガイドが PDF/Word に含まれないこと

@@ -38,7 +38,7 @@ export function AnswerSheetPreview({
                             {choiceQuestions.map((question) => (
                                 <article
                                     key={question.id}
-                                    className="break-inside-avoid border border-gray-300 bg-white p-3"
+                                    className="break-inside-avoid p-1"
                                 >
                                     <h5 className="text-sm font-semibold text-gray-900">
                                         問{displayNumbers.get(question.id)}
@@ -55,7 +55,7 @@ export function AnswerSheetPreview({
                             単語回答
                         </h4>
                         <div
-                            className="grid gap-x-4 gap-y-3"
+                            className="grid gap-x-[18px] gap-y-3"
                             style={{
                                 gridTemplateColumns: `repeat(${layout.word.columns}, minmax(0, 1fr))`,
                             }}
