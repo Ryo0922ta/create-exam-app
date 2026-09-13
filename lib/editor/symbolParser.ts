@@ -102,15 +102,8 @@ export function parseQuestionGroups(text: string): ParsedQuestionGroup[] {
             (symbol) => normalizeQuestionMarker(symbol) !== ownMarker,
         );
         const labels = uniqueLabels(symbols);
-        const hasCircledLabels = labels.some((label) =>
-            /^[①-⑳㉑-㉟]$/.test(label),
-        );
         const suggestedPattern =
-            hasCircledLabels && labels.every((label) => /^[①-⑳㉑-㉟]$/.test(label))
-                ? "circle_comma"
-                : labels.length > 0
-                  ? "sub_parens"
-                  : "essay";
+            labels.length > 0 ? "sub_parens" : "essay";
 
         return {
             label: normalizeQuestionLabel(marker[1]),

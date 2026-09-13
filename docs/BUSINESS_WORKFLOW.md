@@ -177,7 +177,7 @@ flowchart LR
 |---------|---------------|----------|
 | `sub_parens` | 行×列ループ | セル枠 + ラベル枠 |
 | `grid` | 行×列ループ | セル枠のみ |
-| `circle_comma` | `buildCircleCommaLayout` | 外枠1 + 縦横内部線 + 丸数字/カンマ |
+| `circle_comma`（既存） | `buildCircleCommaLayout` | 外枠1 + 縦横内部線 + 丸数字/カンマ |
 | `split_2` | 比率計算 | 左右2 Rect |
 
 `blockWidth` は `clampQuestionBlockWidth()` で 200–1200px に制限。未指定時 `SECTION_STANDARD_WIDTH`（630px）。

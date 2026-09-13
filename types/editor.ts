@@ -21,8 +21,17 @@ export interface SubQuestionCell {
     type: SubQuestionCellType;
 }
 
+export type SubQuestionLabelType =
+    | "circle"
+    | "kana"
+    | "alpha"
+    | "number"
+    | "none"
+    | "manual";
+
 export interface SubQuestionRowConfig {
     labels: string[];
+    labelType?: SubQuestionLabelType;
 }
 
 export interface SubQuestionGroup {
@@ -45,6 +54,22 @@ export interface SubQuestionGroup {
     circleCommaEnabled?: boolean;
     circleCommaPaddingAuto?: boolean;
     circleCommaPaddingRatio?: number;
+    /** 小問複合枠のセル右端にカンマを表示する */
+    subCommaEnabled?: boolean;
+    /** 小問複合枠のカンマ位置を列数に応じて自動調整する */
+    subCommaPaddingAuto?: boolean;
+    /** 小問複合枠の手動カンマ位置（セル幅に対する比率） */
+    subCommaPaddingRatio?: number;
+    /** 記述欄の表示方式。未指定時は従来の単一記述欄 */
+    essayLayout?: "line" | "grid";
+    /** 記述欄の行数 */
+    essayRows?: number;
+    /** 記述欄マス目方式の列数 */
+    essayCols?: number;
+    /** 記述欄マス目方式で表示するマス数 */
+    essayCellCount?: number;
+    /** 記述欄マス目方式の列幅（px）。未指定時は自動計算 */
+    essayColumnWidth?: number;
     splitRatio?: "50:50" | "30:70" | "70:30" | string;
     /** 旧 grouped 形式。読み込み時に sub_parens へ変換する */
     cells?: SubQuestionCell[];

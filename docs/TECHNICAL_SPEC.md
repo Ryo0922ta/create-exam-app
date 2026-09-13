@@ -223,9 +223,9 @@ B4横（364×257mm）サイズの Fabric.js キャンバス上で、大問ブロ
 | `pattern` | 解答枠パターン（下表） |
 | `subRows/Cols/RowHeight/subLabels` | 小問複合枠用 |
 | `gridRows/Cols/RowHeight` | 等分割グリッド用 |
-| `circleRows/Cols/Height/circleCount` | 丸数字区分用（`circleCount = rows × cols` で後方互換） |
-| `circleCommaEnabled` | 全セルに `,` を表示 |
-| `circleCommaPaddingAuto/Ratio` | カンマ位置の自動/手動比率 |
+| `circleRows/Cols/Height/circleCount` | 既存の丸数字区分用（`circleCount = rows × cols` で後方互換） |
+| `circleCommaEnabled` | 既存の丸数字区分で全セルに `,` を表示 |
+| `circleCommaPaddingAuto/Ratio` | 既存の丸数字区分のカンマ位置 |
 | `splitRatio/splitHeight` | 左右2分割枠用 |
 | `blockWidth` | 大問ブロック全体の横幅（px、200–1200、未指定時 630） |
 
@@ -258,7 +258,7 @@ interface PaperMargins {
 | --- | ------ | ---- |
 | `sub_parens` | (1)(2) 小問複合枠 | 行×列、小問ラベル付き |
 | `grid` | 等分割グリッド | 行×列の空マス |
-| `circle_comma` | 丸数字区分 | ①②③…、`,` 区切りオプション |
+| `circle_comma` | 丸数字区分（既存） | ①②③…、`,` 区切りオプション |
 | `split_2` | 左右2分割枠 | 50:50 / 30:70 / 70:30 |
 
 ### Fabric Group が保持する設定
@@ -285,7 +285,7 @@ interface PaperMargins {
 - テキスト入力: 300ms デバウンス + blur 時即時確定
 - パネル閉じる: 選択は維持。選択解除で自動クローズ
 
-## B.8 丸数字（circle_comma）描画仕様
+## B.8 既存の丸数字（circle_comma）描画仕様
 
 - レイアウト: `buildCircleCommaLayout()` — `cellW = blockWidth / cols`, `totalHeight = rows × rowHeight`
 - 番号付け: 行優先 `index = r * cols + c`（①〜⑮、以降は数値フォールバック）
