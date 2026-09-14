@@ -24,8 +24,14 @@ export interface SubQuestionCell {
 export type SubQuestionLabelType =
     | "circle"
     | "kana"
+    | "halfwidth_kana"
+    | "hiragana"
+    | "iroha"
     | "alpha"
+    | "alpha_upper"
     | "number"
+    | "roman_lower"
+    | "roman_upper"
     | "none"
     | "manual";
 
@@ -56,9 +62,11 @@ export interface SubQuestionGroup {
     circleCommaPaddingRatio?: number;
     /** 小問複合枠のセル右端にカンマを表示する */
     subCommaEnabled?: boolean;
+    /** 小問複合枠の各セルに表示するカンマ数 */
+    subCommaCount?: number;
     /** 小問複合枠のカンマ位置を列数に応じて自動調整する */
     subCommaPaddingAuto?: boolean;
-    /** 小問複合枠の手動カンマ位置（セル幅に対する比率） */
+    /** 小問複合枠の手動カンマ位置・複数時の間隔（セル幅に対する比率） */
     subCommaPaddingRatio?: number;
     /** 記述欄の表示方式。未指定時は従来の単一記述欄 */
     essayLayout?: "line" | "grid";

@@ -1300,6 +1300,10 @@ const QuestionBlockForm: React.FC<QuestionBlockFormProps> = ({
                                       group.circleCols || 1,
                                   ),
                               subCommaEnabled: group.subCommaEnabled ?? false,
+                              subCommaCount: Math.max(
+                                  1,
+                                  Number(group.subCommaCount) || 1,
+                              ),
                               subCommaPaddingAuto:
                                   group.subCommaPaddingAuto ?? true,
                               subCommaPaddingRatio:
@@ -2143,6 +2147,39 @@ const QuestionBlockForm: React.FC<QuestionBlockFormProps> = ({
                                             「,」で区切る
                                         </label>
                                         <label className="flex items-center gap-1">
+                                            カンマ数
+                                            <input
+                                                type="number"
+                                                min={1}
+                                                max={20}
+                                                value={Math.max(
+                                                    1,
+                                                    Number(
+                                                        group.subCommaCount,
+                                                    ) || 1,
+                                                )}
+                                                disabled={
+                                                    !group.subCommaEnabled
+                                                }
+                                                onChange={(e) =>
+                                                    updateGroup(groupIndex, {
+                                                        subCommaCount:
+                                                            Math.min(
+                                                                20,
+                                                                Math.max(
+                                                                    1,
+                                                                    Number(
+                                                                        e.target
+                                                                            .value,
+                                                                    ) || 1,
+                                                                ),
+                                                            ),
+                                                    })
+                                                }
+                                                className="w-14 px-1 py-0.5 border border-slate-300 rounded text-center disabled:bg-slate-100"
+                                            />
+                                        </label>
+                                        <label className="flex items-center gap-1">
                                             <input
                                                 type="checkbox"
                                                 checked={
@@ -2161,44 +2198,59 @@ const QuestionBlockForm: React.FC<QuestionBlockFormProps> = ({
                                             />
                                             位置を自動調整
                                         </label>
-                                        <label className="flex items-center gap-1">
-                                            カンマ位置（%）
-                                            <input
-                                                type="number"
-                                                min={5}
-                                                max={95}
-                                                value={Math.round(
-                                                    ((group.subCommaPaddingAuto ??
-                                                    true)
-                                                        ? 0.45
-                                                        : (group.subCommaPaddingRatio ??
-                                                          0.45)) * 100,
-                                                )}
-                                                disabled={
-                                                    !group.subCommaEnabled ||
-                                                    (group.subCommaPaddingAuto ??
+                                        {Math.max(
+                                            1,
+                                            Number(group.subCommaCount) || 1,
+                                        ) === 1 ? (
+                                            <label className="flex items-center gap-1">
+                                                カンマ位置（%）
+                                                <input
+                                                    type="number"
+                                                    min={5}
+                                                    max={95}
+                                                    value={Math.round(
+                                                        ((group.subCommaPaddingAuto ??
                                                         true)
-                                                }
-                                                onChange={(e) =>
-                                                    updateGroup(groupIndex, {
-                                                        subCommaPaddingAuto: false,
-                                                        subCommaPaddingRatio:
-                                                            Math.min(
-                                                                0.95,
-                                                                Math.max(
-                                                                    0.05,
-                                                                    (Number(
-                                                                        e.target
-                                                                            .value,
-                                                                    ) || 5) /
-                                                                        100,
-                                                                ),
-                                                            ),
-                                                    })
-                                                }
-                                                className="w-14 px-1 py-0.5 border border-slate-300 rounded text-center disabled:bg-slate-100"
-                                            />
-                                        </label>
+                                                            ? 0.45
+                                                            : (group.subCommaPaddingRatio ??
+                                                              0.45)) * 100,
+                                                    )}
+                                                    disabled={
+                                                        !group.subCommaEnabled ||
+                                                        (group.subCommaPaddingAuto ??
+                                                            true)
+                                                    }
+                                                    onChange={(e) =>
+                                                        updateGroup(
+                                                            groupIndex,
+                                                            {
+                                                                subCommaPaddingAuto:
+                                                                    false,
+                                                                subCommaPaddingRatio:
+                                                                    Math.min(
+                                                                        0.95,
+                                                                        Math.max(
+                                                                            0.05,
+                                                                            (Number(
+                                                                                e
+                                                                                    .target
+                                                                                    .value,
+                                                                            ) ||
+                                                                                5) /
+                                                                                100,
+                                                                        ),
+                                                                    ),
+                                                            },
+                                                        )
+                                                    }
+                                                    className="w-14 px-1 py-0.5 border border-slate-300 rounded text-center disabled:bg-slate-100"
+                                                />
+                                            </label>
+                                        ) : (
+                                            <span className="text-slate-500">
+                                                カンマはセル全体に等間隔で配置
+                                            </span>
+                                        )}
                                     </div>
                                 )}
                             </div>

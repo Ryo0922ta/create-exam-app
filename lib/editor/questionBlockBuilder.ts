@@ -384,6 +384,24 @@ function resolveSubCommaPadding(
     return Math.max(5, cellWidth * ratio);
 }
 
+function resolveSubCommaPositions(
+    group: SubQuestionGroup,
+    cols: number,
+    cellWidth: number,
+): number[] {
+    const count = Math.max(1, Number(group.subCommaCount) || 1);
+    const rightPadding = resolveSubCommaPadding(group, cols, cellWidth);
+
+    if (count === 1) {
+        return [cellWidth - rightPadding];
+    }
+
+    return Array.from(
+        { length: count },
+        (_, index) => (cellWidth * (index + 1)) / (count + 1),
+    );
+}
+
 function addGroupedPatternFabric(
     items: fabric.Object[],
     group: SubQuestionGroup,
@@ -507,24 +525,23 @@ function addGroupedPatternFabric(
                     );
                 }
                 if (group.subCommaEnabled) {
-                    items.push(
-                        new fabric.Text(",", {
-                            left:
-                                cellX +
-                                cellWidth -
-                                resolveSubCommaPadding(
-                                    group,
-                                    cols,
-                                    cellWidth,
-                                ),
-                            top: cellY + rowHeight / 2,
-                            originX: "center",
-                            originY: "center",
-                            fontFamily: "'Noto Sans JP', sans-serif",
-                            fontSize: 12,
-                            fill: "#000000",
-                        }),
-                    );
+                    for (const commaX of resolveSubCommaPositions(
+                        group,
+                        cols,
+                        cellWidth,
+                    )) {
+                        items.push(
+                            new fabric.Text(",", {
+                                left: cellX + commaX,
+                                top: cellY + rowHeight / 2,
+                                originX: "center",
+                                originY: "center",
+                                fontFamily: "'Noto Sans JP', sans-serif",
+                                fontSize: 12,
+                                fill: "#000000",
+                            }),
+                        );
+                    }
                 }
             });
         });
@@ -712,17 +729,17 @@ function drawGroupedPatternCanvas(
                     ctx.font = "12px 'Noto Sans JP', sans-serif";
                     ctx.textAlign = "center";
                     ctx.textBaseline = "middle";
-                    ctx.fillText(
-                        ",",
-                        cellX +
-                            cellWidth -
-                            resolveSubCommaPadding(
-                                group,
-                                cols,
-                                cellWidth,
-                            ),
-                        cellY + rowHeight / 2,
-                    );
+                    for (const commaX of resolveSubCommaPositions(
+                        group,
+                        cols,
+                        cellWidth,
+                    )) {
+                        ctx.fillText(
+                            ",",
+                            cellX + commaX,
+                            cellY + rowHeight / 2,
+                        );
+                    }
                 }
             });
         });

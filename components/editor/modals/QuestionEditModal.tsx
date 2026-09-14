@@ -231,6 +231,10 @@ export const QuestionEditModal: React.FC<QuestionEditModalProps> = ({
                     group.circleCommaPaddingRatio ??
                     getDefaultCircleCommaPaddingRatio(group.circleCols || 1),
                 subCommaEnabled: group.subCommaEnabled ?? false,
+                subCommaCount: Math.max(
+                    1,
+                    Number(group.subCommaCount) || 1,
+                ),
                 subCommaPaddingAuto: group.subCommaPaddingAuto ?? true,
                 subCommaPaddingRatio: group.subCommaPaddingRatio ?? 0.45,
                 essayLayout: group.essayLayout ?? "line",
