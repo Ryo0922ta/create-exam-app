@@ -31,6 +31,7 @@ export const DEFAULT_NAMEBOX_CONFIG: NameboxConfig = {
     width: 320,
     height: 40,
     labels: ["○年", "組", "番", "氏名"],
+    columnWidths: [40, 40, 40],
 };
 
 export const DEFAULT_SCORE_TABLE_CONFIG: ScoreTableConfig = {
@@ -39,6 +40,71 @@ export const DEFAULT_SCORE_TABLE_CONFIG: ScoreTableConfig = {
     colHeaders: ["知・技", "思・判・表", "合計"],
     maxScores: ["/50", "/50", "/100"],
 };
+
+const BASIC_PART_MIN_ROW_HEIGHT = 15;
+
+function resolveNameboxColumnWidths(
+    config: NameboxConfig,
+    width: number,
+): [number, number, number, number] {
+    const requested = config.columnWidths || [40, 40, 40];
+    const minimumNameWidth = 40;
+    const availableForFixed = Math.max(minimumNameWidth, width - minimumNameWidth);
+    const fixed = requested.map((value) => Math.max(20, Number(value) || 40));
+    const fixedTotal = fixed.reduce((sum, value) => sum + value, 0);
+    const scale = fixedTotal > availableForFixed ? availableForFixed / fixedTotal : 1;
+    const firstThree = fixed.map((value) => Math.max(20, Math.round(value * scale))) as [
+        number,
+        number,
+        number,
+    ];
+    const roundedTotal = firstThree.reduce((sum, value) => sum + value, 0);
+    if (roundedTotal > availableForFixed) {
+        firstThree[2] = Math.max(
+            20,
+            firstThree[2] - (roundedTotal - availableForFixed),
+        );
+    }
+    const nameWidth = Math.max(
+        minimumNameWidth,
+        width - firstThree.reduce((sum, value) => sum + value, 0),
+    );
+    return [...firstThree, nameWidth];
+}
+
+function resolveScoreTableColumns(config: ScoreTableConfig): {
+    colHeaders: string[];
+    maxScores: string[];
+} {
+    const colHeaders =
+        config.colHeaders?.length >= 2
+            ? config.colHeaders.map((value) => value ?? "")
+            : DEFAULT_SCORE_TABLE_CONFIG.colHeaders;
+    const maxScores = colHeaders.map(
+        (_, index) => config.maxScores?.[index] ?? "",
+    );
+    return { colHeaders, maxScores };
+}
+
+function resolveScoreTableRowHeights(
+    config: ScoreTableConfig,
+    height: number,
+): [number, number] {
+    const maxFirstRow = Math.max(
+        BASIC_PART_MIN_ROW_HEIGHT,
+        height - BASIC_PART_MIN_ROW_HEIGHT,
+    );
+    const requestedFirstRow = config.rowHeights?.[0];
+    const firstRow =
+        requestedFirstRow === undefined
+            ? Math.round(height / 2)
+            : Number(requestedFirstRow) || Math.round(height / 2);
+    const clampedFirstRow = Math.min(
+        maxFirstRow,
+        Math.max(BASIC_PART_MIN_ROW_HEIGHT, Math.round(firstRow)),
+    );
+    return [clampedFirstRow, height - clampedFirstRow];
+}
 
 /**
  * 考査見出し枠ブロックを生成
@@ -116,77 +182,45 @@ export function createNameboxBlock(
         }),
     );
 
-    // 区切り線の位置計算 (年, 組, 番 は固定40px、ただし合計が幅の半分を超える場合は比率で調整)
-    const fixedSlotWidth = Math.min(40, w / 4);
-    const x1 = Math.round(fixedSlotWidth);
-    const x2 = Math.round(fixedSlotWidth * 2);
-    const x3 = Math.round(fixedSlotWidth * 3);
+    const columnWidths = resolveNameboxColumnWidths(config, w);
+    const columnEdges = columnWidths.slice(0, 3).reduce<number[]>(
+        (edges, columnWidth) => [
+            ...edges,
+            (edges[edges.length - 1] || 0) + columnWidth,
+        ],
+        [],
+    );
 
-    items.push(
-        new fabric.Line([x1, 0, x1, h], {
-            stroke: "#000000",
-            strokeWidth: 1,
-        }),
-    );
-    items.push(
-        new fabric.Line([x2, 0, x2, h], {
-            stroke: "#000000",
-            strokeWidth: 1,
-        }),
-    );
-    items.push(
-        new fabric.Line([x3, 0, x3, h], {
-            stroke: "#000000",
-            strokeWidth: 1,
-        }),
-    );
+    columnEdges.forEach((x) => {
+        items.push(
+            new fabric.Line([x, 0, x, h], {
+                stroke: "#000000",
+                strokeWidth: 1,
+            }),
+        );
+    });
 
     const textTop = Math.max(4, Math.round((h - 13) / 2));
     const labels = config.labels || DEFAULT_NAMEBOX_CONFIG.labels;
 
-    // 年
-    items.push(
-        new fabric.Text(labels[0] || "", {
-            left: Math.round(x1 / 2),
-            top: textTop,
-            originX: "center",
-            fontFamily: "'Noto Serif JP', serif",
-            fontSize: 13,
-            fill: "#000000",
-        }),
-    );
-    // 組
-    items.push(
-        new fabric.Text(labels[1] || "", {
-            left: Math.round(x1 + (x2 - x1) / 2),
-            top: textTop,
-            originX: "center",
-            fontFamily: "'Noto Serif JP', serif",
-            fontSize: 13,
-            fill: "#000000",
-        }),
-    );
-    // 番
-    items.push(
-        new fabric.Text(labels[2] || "", {
-            left: Math.round(x2 + (x3 - x2) / 2),
-            top: textTop,
-            originX: "center",
-            fontFamily: "'Noto Serif JP', serif",
-            fontSize: 13,
-            fill: "#000000",
-        }),
-    );
-    // 氏名
-    items.push(
-        new fabric.Text(labels[3] || "", {
-            left: x3 + 12,
-            top: textTop,
-            fontFamily: "'Noto Serif JP', serif",
-            fontSize: 13,
-            fill: "#000000",
-        }),
-    );
+    let cellLeft = 0;
+    labels.forEach((label, index) => {
+        const cellWidth = columnWidths[index];
+        items.push(
+            new fabric.Text(label || "", {
+                left:
+                    index < 3
+                        ? Math.round(cellLeft + cellWidth - 6)
+                        : Math.round(cellLeft + 12),
+                top: textTop,
+                originX: index < 3 ? "right" : "left",
+                fontFamily: "'Noto Serif JP', serif",
+                fontSize: 13,
+                fill: "#000000",
+            }),
+        );
+        cellLeft += cellWidth;
+    });
 
     const group = new fabric.Group(items, {
         left,
@@ -196,7 +230,10 @@ export function createNameboxBlock(
     }) as CustomNameboxGroup;
 
     group.customType = "namebox";
-    group.nameboxConfig = JSON.parse(JSON.stringify(config));
+    group.nameboxConfig = {
+        ...JSON.parse(JSON.stringify(config)),
+        columnWidths: columnWidths.slice(0, 3),
+    };
 
     return group;
 }
@@ -212,8 +249,10 @@ export function createScoreTableBlock(
     const items: fabric.Object[] = [];
     const w = Math.max(120, config.width || 240);
     const h = Math.max(30, config.height || 60);
-    const halfH = Math.round(h / 2);
-    const colW = w / 3;
+    const { colHeaders, maxScores } = resolveScoreTableColumns(config);
+    const columnCount = colHeaders.length;
+    const colW = w / columnCount;
+    const [headerHeight, scoreHeight] = resolveScoreTableRowHeights(config, h);
 
     // 外枠
     items.push(
@@ -230,98 +269,50 @@ export function createScoreTableBlock(
 
     // 水平区切り線
     items.push(
-        new fabric.Line([0, halfH, w, halfH], {
+        new fabric.Line([0, headerHeight, w, headerHeight], {
             stroke: "#000000",
             strokeWidth: 1,
         }),
     );
 
-    // 垂直区切り線 2本
-    const x1 = Math.round(colW);
-    const x2 = Math.round(colW * 2);
+    // 垂直区切り線
+    for (let index = 1; index < columnCount; index += 1) {
+        const x = Math.round(colW * index);
+        items.push(
+            new fabric.Line([x, 0, x, h], {
+                stroke: "#000000",
+                strokeWidth: 1,
+            }),
+        );
+    }
 
-    items.push(
-        new fabric.Line([x1, 0, x1, h], {
-            stroke: "#000000",
-            strokeWidth: 1,
-        }),
-    );
-    items.push(
-        new fabric.Line([x2, 0, x2, h], {
-            stroke: "#000000",
-            strokeWidth: 1,
-        }),
-    );
+    const headerTop = Math.max(2, Math.round((headerHeight - 12) / 2));
+    const scoreTop =
+        headerHeight + Math.max(2, Math.round((scoreHeight - 12) / 2));
 
-    const headerTop = Math.max(2, Math.round((halfH - 12) / 2));
-    const scoreTop = halfH + Math.max(2, Math.round((halfH - 12) / 2));
-    const colHeaders =
-        config.colHeaders || DEFAULT_SCORE_TABLE_CONFIG.colHeaders;
-    const maxScores = config.maxScores || DEFAULT_SCORE_TABLE_CONFIG.maxScores;
-
-    // ヘッダー（観点名）
-    items.push(
-        new fabric.Text(colHeaders[0] || "", {
-            left: Math.round(colW * 0.5),
-            top: headerTop,
-            originX: "center",
-            fontFamily: "'Noto Sans JP', sans-serif",
-            fontSize: 12,
-            fill: "#000000",
-        }),
-    );
-    items.push(
-        new fabric.Text(colHeaders[1] || "", {
-            left: Math.round(colW * 1.5),
-            top: headerTop,
-            originX: "center",
-            fontFamily: "'Noto Sans JP', sans-serif",
-            fontSize: 12,
-            fill: "#000000",
-        }),
-    );
-    items.push(
-        new fabric.Text(colHeaders[2] || "", {
-            left: Math.round(colW * 2.5),
-            top: headerTop,
-            originX: "center",
-            fontFamily: "'Noto Sans JP', sans-serif",
-            fontSize: 12,
-            fill: "#000000",
-        }),
-    );
-
-    // 得点/配点表記
-    items.push(
-        new fabric.Text(maxScores[0] || "", {
-            left: Math.round(colW * 1 - 6),
-            top: scoreTop,
-            originX: "right",
-            fontFamily: "'Noto Sans JP', sans-serif",
-            fontSize: 12,
-            fill: "#000000",
-        }),
-    );
-    items.push(
-        new fabric.Text(maxScores[1] || "", {
-            left: Math.round(colW * 2 - 6),
-            top: scoreTop,
-            originX: "right",
-            fontFamily: "'Noto Sans JP', sans-serif",
-            fontSize: 12,
-            fill: "#000000",
-        }),
-    );
-    items.push(
-        new fabric.Text(maxScores[2] || "", {
-            left: Math.round(colW * 3 - 6),
-            top: scoreTop,
-            originX: "right",
-            fontFamily: "'Noto Sans JP', sans-serif",
-            fontSize: 12,
-            fill: "#000000",
-        }),
-    );
+    colHeaders.forEach((header, index) => {
+        const centerX = Math.round(colW * (index + 0.5));
+        items.push(
+            new fabric.Text(header || "", {
+                left: centerX,
+                top: headerTop,
+                originX: "center",
+                fontFamily: "'Noto Sans JP', sans-serif",
+                fontSize: 12,
+                fill: "#000000",
+            }),
+        );
+        items.push(
+            new fabric.Text(maxScores[index] || "", {
+                left: Math.round(colW * (index + 1) - 6),
+                top: scoreTop,
+                originX: "right",
+                fontFamily: "'Noto Sans JP', sans-serif",
+                fontSize: 12,
+                fill: "#000000",
+            }),
+        );
+    });
 
     const group = new fabric.Group(items, {
         left,
@@ -331,7 +322,12 @@ export function createScoreTableBlock(
     }) as CustomScoreTableGroup;
 
     group.customType = "score-table";
-    group.scoreTableConfig = JSON.parse(JSON.stringify(config));
+    group.scoreTableConfig = {
+        ...JSON.parse(JSON.stringify(config)),
+        colHeaders,
+        maxScores,
+        rowHeights: [headerHeight, scoreHeight],
+    };
 
     return group;
 }

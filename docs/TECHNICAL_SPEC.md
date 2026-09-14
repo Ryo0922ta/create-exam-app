@@ -235,8 +235,21 @@ B4横（364×257mm）サイズの Fabric.js キャンバス上で、大問ブロ
 type EditorBlockType = "question-block" | "exam-header" | "namebox" | "score-table";
 
 interface ExamHeaderConfig { text: string; width: number; height: number; }
-interface NameboxConfig { width: number; height: number; labels: [string, string, string, string]; }
-interface ScoreTableConfig { width: number; height: number; colHeaders: [string, string, string]; maxScores: [string, string, string]; }
+interface NameboxConfig {
+  width: number;
+  height: number;
+  labels: [string, string, string, string];
+  /** 第1〜3欄の幅（px）。第4欄（氏名）は全体幅の残り。 */
+  columnWidths?: [number, number, number];
+}
+interface ScoreTableConfig {
+  width: number;
+  height: number;
+  colHeaders: string[];
+  maxScores: string[];
+  /** [観点名行, 配点行] の高さ（px）。未指定時は総高さを50:50で分割。 */
+  rowHeights?: [number, number];
+}
 ```
 
 ### PaperMargins（余白ガイド）

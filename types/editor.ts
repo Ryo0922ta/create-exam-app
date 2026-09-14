@@ -131,13 +131,17 @@ export interface NameboxConfig {
     width: number;
     height: number;
     labels: [string, string, string, string];
+    /** 第1〜3欄の幅（px）。第4欄（氏名）は全体幅の残り。 */
+    columnWidths?: [number, number, number];
 }
 
 export interface ScoreTableConfig {
     width: number;
     height: number;
-    colHeaders: [string, string, string];
-    maxScores: [string, string, string];
+    colHeaders: string[];
+    maxScores: string[];
+    /** [観点名行, 配点行] の高さ（px）。未指定時は総高さを50:50で分割。 */
+    rowHeights?: [number, number];
 }
 
 export interface ShortAnswerOptions {

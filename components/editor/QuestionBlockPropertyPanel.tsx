@@ -343,6 +343,9 @@ const NameboxForm: React.FC<NameboxFormProps> = ({
     ]);
     const [width, setWidth] = useState(config.width || 300);
     const [height, setHeight] = useState(config.height || 40);
+    const [columnWidths, setColumnWidths] = useState<[number, number, number]>(
+        config.columnWidths || [40, 40, 40],
+    );
 
     const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
     const isInitialMountRef = useRef(true);
@@ -357,6 +360,7 @@ const NameboxForm: React.FC<NameboxFormProps> = ({
         ]);
         setWidth(c.width || 300);
         setHeight(c.height || 40);
+        setColumnWidths(c.columnWidths || [40, 40, 40]);
         isInitialMountRef.current = true;
     }, [block]);
 
@@ -373,9 +377,13 @@ const NameboxForm: React.FC<NameboxFormProps> = ({
                     overrides.height !== undefined
                         ? overrides.height
                         : Number(height) || 40,
+                columnWidths:
+                    overrides.columnWidths !== undefined
+                        ? overrides.columnWidths
+                        : columnWidths,
             };
         },
-        [labels, width, height],
+        [labels, width, height, columnWidths],
     );
 
     const triggerImmediateUpdate = useCallback(
@@ -418,6 +426,13 @@ const NameboxForm: React.FC<NameboxFormProps> = ({
         nextLabels[index] = val;
         setLabels(nextLabels);
         triggerDebouncedUpdate({ labels: nextLabels });
+    };
+
+    const updateColumnWidth = (index: number, value: number) => {
+        const next = [...columnWidths] as [number, number, number];
+        next[index] = value;
+        setColumnWidths(next);
+        triggerImmediateUpdate({ columnWidths: next });
     };
 
     return (
@@ -532,6 +547,40 @@ const NameboxForm: React.FC<NameboxFormProps> = ({
                     </div>
                 </div>
 
+                {/* 各セルの幅 */}
+                <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-3">
+                    <div className="font-semibold text-slate-700 text-[11px] pb-1 border-b border-slate-200">
+                        セル幅設定
+                    </div>
+                    {(["年", "組", "番"] as const).map((label, index) => (
+                        <div key={label}>
+                            <div className="flex items-center justify-between mb-1">
+                                <label className="text-slate-600 font-medium">
+                                    {label}欄
+                                </label>
+                                <span className="text-slate-700 font-semibold tabular-nums">
+                                    {columnWidths[index]}px
+                                </span>
+                            </div>
+                            <input
+                                aria-label={`年組氏名欄 ${label}欄の幅（px）`}
+                                type="range"
+                                min={20}
+                                max={120}
+                                step={1}
+                                value={columnWidths[index]}
+                                onChange={(e) =>
+                                    updateColumnWidth(index, Number(e.target.value))
+                                }
+                                className="w-full accent-indigo-600"
+                            />
+                        </div>
+                    ))}
+                    <p className="text-[10px] text-slate-400">
+                        氏名欄は枠全体の幅から自動計算されます。
+                    </p>
+                </div>
+
                 {/* 幅と高さ */}
                 <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-3">
                     <div className="font-semibold text-slate-700 text-[11px] pb-1 border-b border-slate-200">
@@ -607,36 +656,47 @@ const ScoreTableForm: React.FC<ScoreTableFormProps> = ({
 }) => {
     const config = block.scoreTableConfig || DEFAULT_SCORE_TABLE_CONFIG;
 
-    const [colHeaders, setColHeaders] = useState<[string, string, string]>([
-        config.colHeaders?.[0] ?? "知・技",
-        config.colHeaders?.[1] ?? "思・判・表",
-        config.colHeaders?.[2] ?? "合計",
-    ]);
-    const [maxScores, setMaxScores] = useState<[string, string, string]>([
-        config.maxScores?.[0] ?? "/50",
-        config.maxScores?.[1] ?? "/50",
-        config.maxScores?.[2] ?? "/100",
-    ]);
+    const [colHeaders, setColHeaders] = useState<string[]>(
+        config.colHeaders?.length >= 2
+            ? [...config.colHeaders]
+            : ["知・技", "思・判・表", "合計"],
+    );
+    const [maxScores, setMaxScores] = useState<string[]>(
+        config.colHeaders?.length >= 2
+            ? config.colHeaders.map((_, index) => config.maxScores?.[index] ?? "")
+            : ["/50", "/50", "/100"],
+    );
     const [width, setWidth] = useState(config.width || 240);
     const [height, setHeight] = useState(config.height || 60);
+    const [rowHeights, setRowHeights] = useState<[number, number]>(
+        config.rowHeights || [
+            Math.round((config.height || 60) / 2),
+            Math.floor((config.height || 60) / 2),
+        ],
+    );
 
     const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
     const isInitialMountRef = useRef(true);
 
     useEffect(() => {
         const c = block.scoreTableConfig || DEFAULT_SCORE_TABLE_CONFIG;
-        setColHeaders([
-            c.colHeaders?.[0] ?? "知・技",
-            c.colHeaders?.[1] ?? "思・判・表",
-            c.colHeaders?.[2] ?? "合計",
-        ]);
-        setMaxScores([
-            c.maxScores?.[0] ?? "/50",
-            c.maxScores?.[1] ?? "/50",
-            c.maxScores?.[2] ?? "/100",
-        ]);
+        const nextHeaders =
+            c.colHeaders?.length >= 2
+                ? [...c.colHeaders]
+                : ["知・技", "思・判・表", "合計"];
+        setColHeaders(nextHeaders);
+        setMaxScores(
+            nextHeaders.map((_, index) => c.maxScores?.[index] ?? ""),
+        );
         setWidth(c.width || 240);
         setHeight(c.height || 60);
+        const nextHeight = c.height || 60;
+        setRowHeights(
+            c.rowHeights || [
+                Math.round(nextHeight / 2),
+                Math.floor(nextHeight / 2),
+            ],
+        );
         isInitialMountRef.current = true;
     }, [block]);
 
@@ -659,9 +719,13 @@ const ScoreTableForm: React.FC<ScoreTableFormProps> = ({
                     overrides.height !== undefined
                         ? overrides.height
                         : Number(height) || 60,
+                rowHeights:
+                    overrides.rowHeights !== undefined
+                        ? overrides.rowHeights
+                        : rowHeights,
             };
         },
-        [colHeaders, maxScores, width, height],
+        [colHeaders, maxScores, width, height, rowHeights],
     );
 
     const triggerImmediateUpdate = useCallback(
@@ -700,17 +764,47 @@ const ScoreTableForm: React.FC<ScoreTableFormProps> = ({
     }, []);
 
     const updateColHeader = (index: number, val: string) => {
-        const next: [string, string, string] = [...colHeaders];
+        const next = [...colHeaders];
         next[index] = val;
         setColHeaders(next);
         triggerDebouncedUpdate({ colHeaders: next });
     };
 
     const updateMaxScore = (index: number, val: string) => {
-        const next: [string, string, string] = [...maxScores];
+        const next = [...maxScores];
         next[index] = val;
         setMaxScores(next);
         triggerDebouncedUpdate({ maxScores: next });
+    };
+
+    const addColumn = () => {
+        if (colHeaders.length >= 8) return;
+        const nextHeaders = [...colHeaders, `観点${colHeaders.length + 1}`];
+        const nextScores = [...maxScores, ""];
+        setColHeaders(nextHeaders);
+        setMaxScores(nextScores);
+        triggerImmediateUpdate({
+            colHeaders: nextHeaders,
+            maxScores: nextScores,
+        });
+    };
+
+    const removeColumn = (index: number) => {
+        if (colHeaders.length <= 2) return;
+        const nextHeaders = colHeaders.filter((_, itemIndex) => itemIndex !== index);
+        const nextScores = maxScores.filter((_, itemIndex) => itemIndex !== index);
+        setColHeaders(nextHeaders);
+        setMaxScores(nextScores);
+        triggerImmediateUpdate({
+            colHeaders: nextHeaders,
+            maxScores: nextScores,
+        });
+    };
+
+    const updateHeaderRowHeight = (value: number) => {
+        const next: [number, number] = [value, Math.max(15, height - value)];
+        setRowHeights(next);
+        triggerImmediateUpdate({ rowHeights: next });
     };
 
     return (
@@ -754,7 +848,7 @@ const ScoreTableForm: React.FC<ScoreTableFormProps> = ({
                         観点名と配点
                     </label>
 
-                    {[0, 1, 2].map((idx) => (
+                    {colHeaders.map((_, idx) => (
                         <div
                             key={idx}
                             className="p-2 bg-slate-50 border border-slate-200 rounded space-y-1.5"
@@ -799,9 +893,26 @@ const ScoreTableForm: React.FC<ScoreTableFormProps> = ({
                                         className="w-full px-2 py-1 border border-slate-300 rounded focus:ring-1 focus:ring-indigo-500 bg-white"
                                     />
                                 </div>
+                                <button
+                                    type="button"
+                                    aria-label={`列${idx + 1}を削除`}
+                                    onClick={() => removeColumn(idx)}
+                                    disabled={colHeaders.length <= 2}
+                                    className="col-span-2 text-[10px] text-rose-600 disabled:text-slate-300 text-right"
+                                >
+                                    この観点を削除
+                                </button>
                             </div>
                         </div>
                     ))}
+                    <button
+                        type="button"
+                        onClick={addColumn}
+                        disabled={colHeaders.length >= 8}
+                        className="w-full px-2 py-1.5 text-xs rounded border border-indigo-300 text-indigo-700 hover:bg-indigo-50 disabled:text-slate-300 disabled:border-slate-200"
+                    >
+                        + 観点を追加（{colHeaders.length}/8）
+                    </button>
                 </div>
 
                 {/* 幅と高さ */}
@@ -852,10 +963,44 @@ const ScoreTableForm: React.FC<ScoreTableFormProps> = ({
                             onChange={(e) => {
                                 const v = Number(e.target.value);
                                 setHeight(v);
-                                triggerImmediateUpdate({ height: v });
+                                const nextRowHeights: [number, number] = [
+                                    Math.min(v - 15, rowHeights[0]),
+                                    Math.max(15, v - Math.min(v - 15, rowHeights[0])),
+                                ];
+                                setRowHeights(nextRowHeights);
+                                triggerImmediateUpdate({
+                                    height: v,
+                                    rowHeights: nextRowHeights,
+                                });
                             }}
                             className="w-full accent-indigo-600"
                         />
+                    </div>
+
+                    <div>
+                        <div className="flex items-center justify-between mb-1">
+                            <label className="text-slate-600 font-medium">
+                                観点名行の高さ
+                            </label>
+                            <span className="text-slate-700 font-semibold tabular-nums">
+                                {rowHeights[0]}px
+                            </span>
+                        </div>
+                        <input
+                            aria-label="観点名行の高さ（px）"
+                            type="range"
+                            min={15}
+                            max={Math.max(15, height - 15)}
+                            step={1}
+                            value={Math.min(rowHeights[0], Math.max(15, height - 15))}
+                            onChange={(e) =>
+                                updateHeaderRowHeight(Number(e.target.value))
+                            }
+                            className="w-full accent-indigo-600"
+                        />
+                        <p className="text-[10px] text-slate-400">
+                            配点行は残りの高さになります（{rowHeights[1]}px）。
+                        </p>
                     </div>
                 </div>
             </div>
