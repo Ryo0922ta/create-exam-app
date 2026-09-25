@@ -49,3 +49,6 @@ Thumbs.db
 .idea/
 *.sublime-workspace
 *.sublime-project
+
+# mcp
+mcp.json
