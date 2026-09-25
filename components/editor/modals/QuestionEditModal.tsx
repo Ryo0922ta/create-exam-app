@@ -36,28 +36,13 @@ const createDefaultGroupedGroups = (): SubQuestionGroup[] => [
     {
         label: "1",
         height: 42,
-        pattern: "grid",
-        gridRows: 1,
-        gridCols: 1,
-    },
-    {
-        label: "2",
-        height: 42,
         pattern: "sub_parens",
-        subRows: 1,
-        subCols: 3,
-        subLabels: ["(a)", "(b)", "(c)"],
-        cells: [
-            { label: "(a)", widthRatio: 1, type: "box" },
-            { label: "(b)", widthRatio: 1, type: "box" },
-            { label: "(c)", widthRatio: 1, type: "box" },
+        subRowConfigs: [
+            {
+                labels: ["①", "②"],
+                labelType: "circle",
+            },
         ],
-    },
-    {
-        label: "3",
-        height: 42,
-        pattern: "essay",
-        cells: [{ label: "", widthRatio: 1, type: "essay" }],
     },
 ];
 
@@ -234,6 +219,7 @@ export const QuestionEditModal: React.FC<QuestionEditModalProps> = ({
                 subLabels: group.subLabels || [],
                 subRowConfigs: group.subRowConfigs?.map((row) => ({
                     labels: row.labels.map((label) => label.trim()),
+                    labelType: row.labelType,
                 })),
                 gridRows: Math.max(1, Number(group.gridRows) || 1),
                 gridCols: Math.max(1, Number(group.gridCols) || 1),
@@ -244,6 +230,29 @@ export const QuestionEditModal: React.FC<QuestionEditModalProps> = ({
                 circleCommaPaddingRatio:
                     group.circleCommaPaddingRatio ??
                     getDefaultCircleCommaPaddingRatio(group.circleCols || 1),
+                subCommaEnabled: group.subCommaEnabled ?? false,
+                subCommaCount: Math.max(
+                    1,
+                    Number(group.subCommaCount) || 1,
+                ),
+                subCommaPaddingAuto: group.subCommaPaddingAuto ?? true,
+                subCommaPaddingRatio: group.subCommaPaddingRatio ?? 0.45,
+                essayLayout: group.essayLayout ?? "line",
+                essayRows: Math.max(1, Number(group.essayRows) || 1),
+                essayCols: Math.max(1, Number(group.essayCols) || 1),
+                essayCellCount: Math.max(
+                    1,
+                    Math.min(
+                        Math.max(1, Number(group.essayCellCount) || 1),
+                        Math.max(1, Number(group.essayRows) || 1) *
+                            Math.max(1, Number(group.essayCols) || 1),
+                    ),
+                ),
+                essayColumnWidth:
+                    group.essayColumnWidth &&
+                    group.essayColumnWidth > 0
+                        ? group.essayColumnWidth
+                        : undefined,
                 splitRatio: group.splitRatio || "50:50",
                 cells: (group.cells || []).map((cell) => ({
                     label: cell.label.trim(),
@@ -321,7 +330,13 @@ export const QuestionEditModal: React.FC<QuestionEditModalProps> = ({
             {
                 label: String(current.length + 1),
                 height: 42,
-                pattern: "essay",
+                pattern: "sub_parens",
+                subRowConfigs: [
+                    {
+                        labels: ["①", "②"],
+                        labelType: "circle",
+                    },
+                ],
             },
         ]);
     };
@@ -560,289 +575,6 @@ export const QuestionEditModal: React.FC<QuestionEditModalProps> = ({
                             </div>
                         )}
 
-                        {pattern === "grid" && (
-                            <div className="grid grid-cols-3 gap-3">
-                                <div>
-                                    <label className="block text-slate-600 font-semibold mb-1">
-                                        行数
-                                    </label>
-                                    <input
-                                        type="number"
-                                        aria-label="グリッド枠の行数"
-                                        value={gridRows}
-                                        min={1}
-                                        max={10}
-                                        onChange={(e) =>
-                                            setGridRows(
-                                                parseInt(e.target.value, 10) ||
-                                                    1,
-                                            )
-                                        }
-                                        className="w-full px-2.5 py-1.5 border border-slate-300 rounded text-center bg-white"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-slate-600 font-semibold mb-1">
-                                        列数
-                                    </label>
-                                    <input
-                                        type="number"
-                                        aria-label="グリッド枠の列数"
-                                        value={gridCols}
-                                        min={1}
-                                        max={10}
-                                        onChange={(e) =>
-                                            setGridCols(
-                                                parseInt(e.target.value, 10) ||
-                                                    1,
-                                            )
-                                        }
-                                        className="w-full px-2.5 py-1.5 border border-slate-300 rounded text-center bg-white"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-slate-600 font-semibold mb-1">
-                                        1行の高さ
-                                    </label>
-                                    <input
-                                        type="number"
-                                        aria-label="グリッド枠の1行の高さ（px）"
-                                        value={gridRowHeight}
-                                        min={20}
-                                        max={80}
-                                        onChange={(e) =>
-                                            setGridRowHeight(
-                                                parseInt(e.target.value, 10) ||
-                                                    20,
-                                            )
-                                        }
-                                        className="w-full px-2.5 py-1.5 border border-slate-300 rounded text-center bg-white"
-                                    />
-                                </div>
-                            </div>
-                        )}
-
-                        {pattern === "circle_comma" && (
-                            <div className="space-y-3">
-                                <div className="grid grid-cols-3 gap-3">
-                                    <div>
-                                        <label className="block text-slate-600 font-semibold mb-1">
-                                            行数
-                                        </label>
-                                        <input
-                                            type="number"
-                                            aria-label="丸数字枠の行数"
-                                            value={circleRows}
-                                            min={1}
-                                            max={10}
-                                            onChange={(e) =>
-                                                setCircleRows(
-                                                    parseInt(
-                                                        e.target.value,
-                                                        10,
-                                                    ) || 1,
-                                                )
-                                            }
-                                            className="w-full px-2.5 py-1.5 border border-slate-300 rounded text-center bg-white"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-slate-600 font-semibold mb-1">
-                                            列数
-                                        </label>
-                                        <input
-                                            type="number"
-                                            aria-label="丸数字枠の列数"
-                                            value={circleCols}
-                                            min={1}
-                                            max={15}
-                                            onChange={(e) =>
-                                                setCircleCols(
-                                                    parseInt(
-                                                        e.target.value,
-                                                        10,
-                                                    ) || 1,
-                                                )
-                                            }
-                                            className="w-full px-2.5 py-1.5 border border-slate-300 rounded text-center bg-white"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-slate-600 font-semibold mb-1">
-                                            1行の高さ
-                                        </label>
-                                        <input
-                                            type="number"
-                                            aria-label="丸数字枠の1行の高さ（px）"
-                                            value={circleHeight}
-                                            min={20}
-                                            max={80}
-                                            onChange={(e) =>
-                                                setCircleHeight(
-                                                    parseInt(
-                                                        e.target.value,
-                                                        10,
-                                                    ) || 20,
-                                                )
-                                            }
-                                            className="w-full px-2.5 py-1.5 border border-slate-300 rounded text-center bg-white"
-                                        />
-                                    </div>
-                                </div>
-                                <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-2">
-                                    <label className="flex items-center gap-2 text-slate-700 font-semibold cursor-pointer">
-                                        <input
-                                            type="checkbox"
-                                            aria-label="カンマ区切りを有効にする"
-                                            checked={circleCommaEnabled}
-                                            disabled={
-                                                circleRows * circleCols <= 1
-                                            }
-                                            onChange={(e) =>
-                                                setCircleCommaEnabled(
-                                                    e.target.checked,
-                                                )
-                                            }
-                                            className="rounded text-indigo-600 focus:ring-indigo-500"
-                                        />
-                                        <span>「,」で区切る</span>
-                                    </label>
-                                    {circleCommaEnabled &&
-                                        circleRows * circleCols > 1 && (
-                                            <>
-                                                <label className="flex items-center gap-2 text-slate-700 font-semibold cursor-pointer">
-                                                    <input
-                                                        type="checkbox"
-                                                        aria-label="カンマ位置を自動調整"
-                                                        checked={
-                                                            circleCommaPaddingAuto
-                                                        }
-                                                        onChange={(e) => {
-                                                            const auto =
-                                                                e.target
-                                                                    .checked;
-                                                            setCircleCommaPaddingAuto(
-                                                                auto,
-                                                            );
-                                                            if (!auto) {
-                                                                setCircleCommaPaddingRatio(
-                                                                    getDefaultCircleCommaPaddingRatio(
-                                                                        circleCols,
-                                                                    ),
-                                                                );
-                                                            }
-                                                        }}
-                                                        className="rounded text-indigo-600 focus:ring-indigo-500"
-                                                    />
-                                                    <span>位置を自動調整</span>
-                                                </label>
-                                                <div>
-                                                    <label className="block text-slate-600 font-semibold mb-1">
-                                                        カンマ位置（セル幅に対する比率
-                                                        %）
-                                                    </label>
-                                                    <div className="flex items-center gap-2">
-                                                        <input
-                                                            type="number"
-                                                            aria-label="カンマ位置（%）"
-                                                            value={Math.round(
-                                                                (circleCommaPaddingAuto
-                                                                    ? getDefaultCircleCommaPaddingRatio(
-                                                                          circleCols,
-                                                                      )
-                                                                    : circleCommaPaddingRatio) *
-                                                                    100,
-                                                            )}
-                                                            min={5}
-                                                            max={95}
-                                                            disabled={
-                                                                circleCommaPaddingAuto
-                                                            }
-                                                            onChange={(e) => {
-                                                                const pct =
-                                                                    parseInt(
-                                                                        e.target
-                                                                            .value,
-                                                                        10,
-                                                                    ) || 5;
-                                                                const clamped =
-                                                                    Math.min(
-                                                                        95,
-                                                                        Math.max(
-                                                                            5,
-                                                                            pct,
-                                                                        ),
-                                                                    );
-                                                                setCircleCommaPaddingAuto(
-                                                                    false,
-                                                                );
-                                                                setCircleCommaPaddingRatio(
-                                                                    clamped /
-                                                                        100,
-                                                                );
-                                                            }}
-                                                            className="w-full max-w-[120px] px-2.5 py-1.5 border border-slate-300 rounded text-center bg-white disabled:bg-slate-100 disabled:text-slate-500"
-                                                        />
-                                                        {circleCommaPaddingAuto && (
-                                                            <span className="text-xs text-slate-500 whitespace-nowrap">
-                                                                （自動）
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            </>
-                                        )}
-                                </div>
-                            </div>
-                        )}
-
-                        {pattern === "split_2" && (
-                            <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                    <label className="block text-slate-600 font-semibold mb-1">
-                                        分割比率
-                                    </label>
-                                    <select
-                                        aria-label="左右2分割の分割比率"
-                                        value={splitRatio}
-                                        onChange={(e) =>
-                                            setSplitRatio(e.target.value)
-                                        }
-                                        className="w-full px-2.5 py-1.5 border border-slate-300 rounded bg-white"
-                                    >
-                                        <option value="50:50">
-                                            50% : 50% (均等)
-                                        </option>
-                                        <option value="30:70">
-                                            30% : 70% (左狭め)
-                                        </option>
-                                        <option value="70:30">
-                                            70% : 30% (右狭め)
-                                        </option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="block text-slate-600 font-semibold mb-1">
-                                        枠の高さ
-                                    </label>
-                                    <input
-                                        type="number"
-                                        aria-label="左右2分割枠の高さ（px）"
-                                        value={splitHeight}
-                                        min={25}
-                                        max={120}
-                                        onChange={(e) =>
-                                            setSplitHeight(
-                                                parseInt(e.target.value, 10) ||
-                                                    25,
-                                            )
-                                        }
-                                        className="w-full px-2.5 py-1.5 border border-slate-300 rounded text-center bg-white"
-                                    />
-                                </div>
-                            </div>
-                        )}
-
                         {false && pattern === "grouped" && (
                             <div className="space-y-3">
                                 <div className="flex items-center justify-between">
@@ -936,15 +668,6 @@ export const QuestionEditModal: React.FC<QuestionEditModalProps> = ({
                                             <option value="sub_parens">
                                                 小問複合枠
                                             </option>
-                                            <option value="grid">
-                                                等分割グリッド
-                                            </option>
-                                            <option value="circle_comma">
-                                                丸数字区分
-                                            </option>
-                                            <option value="split_2">
-                                                左右2分割
-                                            </option>
                                             <option value="essay">
                                                 記述欄
                                             </option>
@@ -1025,227 +748,6 @@ export const QuestionEditModal: React.FC<QuestionEditModalProps> = ({
                                                     placeholder="(a), (b)"
                                                 />
                                             </div>
-                                        )}
-
-                                        {group.pattern === "grid" && (
-                                            <div className="grid grid-cols-2 gap-1.5">
-                                                <input
-                                                    type="number"
-                                                    min={1}
-                                                    max={10}
-                                                    aria-label={`小問${groupIndex + 1}グリッド行数`}
-                                                    value={group.gridRows || 1}
-                                                    onChange={(e) =>
-                                                        updateGroup(
-                                                            groupIndex,
-                                                            {
-                                                                gridRows:
-                                                                    Number(
-                                                                        e.target
-                                                                            .value,
-                                                                    ) || 1,
-                                                            },
-                                                        )
-                                                    }
-                                                    className="w-full px-1.5 py-1 border border-slate-300 rounded text-center"
-                                                    placeholder="行数"
-                                                />
-                                                <input
-                                                    type="number"
-                                                    min={1}
-                                                    max={12}
-                                                    aria-label={`小問${groupIndex + 1}グリッド列数`}
-                                                    value={group.gridCols || 1}
-                                                    onChange={(e) =>
-                                                        updateGroup(
-                                                            groupIndex,
-                                                            {
-                                                                gridCols:
-                                                                    Number(
-                                                                        e.target
-                                                                            .value,
-                                                                    ) || 1,
-                                                            },
-                                                        )
-                                                    }
-                                                    className="w-full px-1.5 py-1 border border-slate-300 rounded text-center"
-                                                    placeholder="列数"
-                                                />
-                                            </div>
-                                        )}
-
-                                        {group.pattern === "circle_comma" && (
-                                            <div className="grid grid-cols-2 gap-1.5">
-                                                <input
-                                                    type="number"
-                                                    min={1}
-                                                    max={10}
-                                                    aria-label={`小問${groupIndex + 1}丸数字行数`}
-                                                    value={
-                                                        group.circleRows || 1
-                                                    }
-                                                    onChange={(e) =>
-                                                        updateGroup(
-                                                            groupIndex,
-                                                            {
-                                                                circleRows:
-                                                                    Number(
-                                                                        e.target
-                                                                            .value,
-                                                                    ) || 1,
-                                                            },
-                                                        )
-                                                    }
-                                                    className="w-full px-1.5 py-1 border border-slate-300 rounded text-center"
-                                                    placeholder="行数"
-                                                />
-                                                <input
-                                                    type="number"
-                                                    min={1}
-                                                    max={15}
-                                                    aria-label={`小問${groupIndex + 1}丸数字列数`}
-                                                    value={
-                                                        group.circleCols || 1
-                                                    }
-                                                    onChange={(e) =>
-                                                        updateGroup(
-                                                            groupIndex,
-                                                            {
-                                                                circleCols:
-                                                                    Number(
-                                                                        e.target
-                                                                            .value,
-                                                                    ) || 1,
-                                                            },
-                                                        )
-                                                    }
-                                                    className="w-full px-1.5 py-1 border border-slate-300 rounded text-center"
-                                                    placeholder="列数"
-                                                />
-                                                <label className="col-span-2 flex items-center gap-1 text-[10px] text-slate-600">
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={
-                                                            group.circleCommaEnabled ??
-                                                            false
-                                                        }
-                                                        onChange={(e) =>
-                                                            updateGroup(
-                                                                groupIndex,
-                                                                {
-                                                                    circleCommaEnabled:
-                                                                        e.target
-                                                                            .checked,
-                                                                },
-                                                            )
-                                                        }
-                                                    />
-                                                    「,」で区切る
-                                                </label>
-                                                <label className="col-span-2 flex items-center gap-1 text-[10px] text-slate-600">
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={
-                                                            group.circleCommaPaddingAuto ??
-                                                            true
-                                                        }
-                                                        disabled={
-                                                            !group.circleCommaEnabled
-                                                        }
-                                                        onChange={(e) =>
-                                                            updateGroup(
-                                                                groupIndex,
-                                                                {
-                                                                    circleCommaPaddingAuto:
-                                                                        e.target
-                                                                            .checked,
-                                                                },
-                                                            )
-                                                        }
-                                                    />
-                                                    位置を自動調整
-                                                </label>
-                                                <label className="col-span-2 flex items-center gap-1 text-[10px] text-slate-600">
-                                                    カンマ位置（セル幅に対する比率
-                                                    %）
-                                                    <input
-                                                        type="number"
-                                                        min={5}
-                                                        max={95}
-                                                        value={Math.round(
-                                                            ((group.circleCommaPaddingAuto ??
-                                                            true)
-                                                                ? getDefaultCircleCommaPaddingRatio(
-                                                                      group.circleCols ||
-                                                                          1,
-                                                                  )
-                                                                : (group.circleCommaPaddingRatio ??
-                                                                  0.45)) * 100,
-                                                        )}
-                                                        disabled={
-                                                            !group.circleCommaEnabled ||
-                                                            (group.circleCommaPaddingAuto ??
-                                                                true)
-                                                        }
-                                                        onChange={(e) =>
-                                                            updateGroup(
-                                                                groupIndex,
-                                                                {
-                                                                    circleCommaPaddingAuto: false,
-                                                                    circleCommaPaddingRatio:
-                                                                        Math.min(
-                                                                            0.95,
-                                                                            Math.max(
-                                                                                0.05,
-                                                                                (Number(
-                                                                                    e
-                                                                                        .target
-                                                                                        .value,
-                                                                                ) ||
-                                                                                    5) /
-                                                                                    100,
-                                                                            ),
-                                                                        ),
-                                                                },
-                                                            )
-                                                        }
-                                                        className="w-16 px-1.5 py-1 border border-slate-300 rounded text-center disabled:bg-slate-100"
-                                                    />
-                                                    %
-                                                    {(group.circleCommaPaddingAuto ??
-                                                        true) && (
-                                                        <span className="text-slate-400">
-                                                            （自動）
-                                                        </span>
-                                                    )}
-                                                </label>
-                                            </div>
-                                        )}
-
-                                        {group.pattern === "split_2" && (
-                                            <select
-                                                aria-label={`小問${groupIndex + 1}分割比率`}
-                                                value={
-                                                    group.splitRatio || "50:50"
-                                                }
-                                                onChange={(e) =>
-                                                    updateGroup(groupIndex, {
-                                                        splitRatio:
-                                                            e.target.value,
-                                                    })
-                                                }
-                                                className="w-full px-2 py-1 border border-slate-300 rounded bg-white"
-                                            >
-                                                <option value="50:50">
-                                                    50 : 50
-                                                </option>
-                                                <option value="30:70">
-                                                    30 : 70
-                                                </option>
-                                                <option value="70:30">
-                                                    70 : 30
-                                                </option>
-                                            </select>
                                         )}
                                     </div>
                                 ))}

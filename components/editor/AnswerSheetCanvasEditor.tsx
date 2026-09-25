@@ -592,11 +592,25 @@ export const AnswerSheetCanvasEditor: React.FC = () => {
     const handleClone = () => {
         const canvas = fabricCanvasRef.current;
         const activeObj = canvas?.getActiveObject() as
-            | CustomQuestionBlockGroup
+            | (fabric.Group & {
+                  customType?: string;
+                  questionConfig?: QuestionBlockConfig;
+                  examHeaderConfig?: ExamHeaderConfig;
+                  nameboxConfig?: NameboxConfig;
+                  scoreTableConfig?: ScoreTableConfig;
+              })
             | undefined;
         if (!canvas || !activeObj) return;
 
-        activeObj.clone((cloned: CustomQuestionBlockGroup) => {
+        const cloneSource = activeObj as fabric.Object;
+        cloneSource.clone((clonedObject: fabric.Object) => {
+            const cloned = clonedObject as fabric.Group & {
+                customType?: string;
+                questionConfig?: QuestionBlockConfig;
+                examHeaderConfig?: ExamHeaderConfig;
+                nameboxConfig?: NameboxConfig;
+                scoreTableConfig?: ScoreTableConfig;
+            };
             cloned.set({
                 left: (activeObj.left || 0) + GRID_CELL_SIZE_PX.x,
                 top: (activeObj.top || 0) + GRID_CELL_SIZE_PX.y,
@@ -606,6 +620,21 @@ export const AnswerSheetCanvasEditor: React.FC = () => {
             if (activeObj.questionConfig) {
                 cloned.questionConfig = JSON.parse(
                     JSON.stringify(activeObj.questionConfig),
+                );
+            }
+            if (activeObj.examHeaderConfig) {
+                cloned.examHeaderConfig = JSON.parse(
+                    JSON.stringify(activeObj.examHeaderConfig),
+                );
+            }
+            if (activeObj.nameboxConfig) {
+                cloned.nameboxConfig = JSON.parse(
+                    JSON.stringify(activeObj.nameboxConfig),
+                );
+            }
+            if (activeObj.scoreTableConfig) {
+                cloned.scoreTableConfig = JSON.parse(
+                    JSON.stringify(activeObj.scoreTableConfig),
                 );
             }
             canvas.add(cloned);

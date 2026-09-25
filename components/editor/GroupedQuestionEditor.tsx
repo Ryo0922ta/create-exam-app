@@ -3,8 +3,13 @@
 import React from "react";
 import {
     SubQuestionGroup,
+    SubQuestionLabelType,
     SubQuestionPattern,
 } from "@/types/editor";
+import {
+    createSubQuestionLabels,
+    SUB_QUESTION_LABEL_OPTIONS,
+} from "@/lib/editor/subQuestionLabels";
 
 interface GroupedQuestionEditorProps {
     groups: SubQuestionGroup[];
@@ -25,30 +30,52 @@ const updateAtPath = (
 const createLeaf = (label: string): SubQuestionGroup => ({
     label,
     height: 42,
-    pattern: "essay",
+    pattern: "sub_parens",
+    subRowConfigs: [
+        {
+            labels: ["①", "②"],
+            labelType: "circle",
+        },
+    ],
 });
 
-const getSubParensRows = (group: SubQuestionGroup): string[][] => {
+type EditableSubQuestionRow = {
+    labels: string[];
+    labelType: SubQuestionLabelType;
+};
+
+const getSubParensRows = (
+    group: SubQuestionGroup,
+): EditableSubQuestionRow[] => {
     if (group.subRowConfigs?.length) {
-        return group.subRowConfigs.map((row) => [...row.labels]);
+        return group.subRowConfigs.map((row) => ({
+            labels: [...row.labels],
+            labelType: row.labelType || "manual",
+        }));
     }
 
     const rows = Math.max(1, Number(group.subRows) || 1);
     const cols = Math.max(1, Number(group.subCols) || 1);
-    return Array.from({ length: rows }, (_, rowIndex) =>
-        Array.from(
+    return Array.from({ length: rows }, (_, rowIndex) => ({
+        labels: Array.from(
             { length: cols },
             (_, colIndex) =>
                 group.subLabels?.[rowIndex * cols + colIndex] || "",
         ),
-    );
+        labelType: "manual",
+    }));
 };
 
-const rowsToUpdates = (rows: string[][]): Partial<SubQuestionGroup> => ({
-    subRowConfigs: rows.map((labels) => ({ labels })),
+const rowsToUpdates = (
+    rows: EditableSubQuestionRow[],
+): Partial<SubQuestionGroup> => ({
+    subRowConfigs: rows.map((row) => ({
+        labels: row.labels,
+        labelType: row.labelType,
+    })),
     subRows: rows.length,
-    subCols: Math.max(1, ...rows.map((labels) => labels.length)),
-    subLabels: rows.flat(),
+    subCols: Math.max(1, ...rows.map((row) => row.labels.length)),
+    subLabels: rows.flatMap((row) => row.labels),
 });
 
 const GroupNodeEditor: React.FC<{
@@ -58,11 +85,33 @@ const GroupNodeEditor: React.FC<{
     onChange: (path: number[], updates: Partial<SubQuestionGroup>) => void;
     onRemove: (path: number[]) => void;
 }> = ({ group, path, canRemove, onChange, onRemove }) => {
-    const pattern = group.pattern || "essay";
+    const pattern = group.pattern || "sub_parens";
     const update = (updates: Partial<SubQuestionGroup>) =>
         onChange(path, updates);
     const rows = getSubParensRows(group);
-    const updateRows = (nextRows: string[][]) => update(rowsToUpdates(nextRows));
+    const updateRows = (nextRows: EditableSubQuestionRow[]) =>
+        update(rowsToUpdates(nextRows));
+    const updateLabelType = (
+        rowIndex: number,
+        labelType: SubQuestionLabelType,
+    ) => {
+        const nextRows = rows.map((row, index) =>
+            index === rowIndex
+                ? {
+                      ...row,
+                      labelType,
+                      labels:
+                          labelType === "manual"
+                              ? row.labels
+                              : createSubQuestionLabels(
+                                    labelType,
+                                    row.labels.length,
+                                ),
+                  }
+                : row,
+        );
+        updateRows(nextRows);
+    };
     const updateCellLabel = (
         rowIndex: number,
         colIndex: number,
@@ -70,23 +119,43 @@ const GroupNodeEditor: React.FC<{
     ) => {
         const nextRows = rows.map((row, index) => {
             if (index !== rowIndex) return row;
-            const nextRow = [...row];
-            nextRow[colIndex] = value;
-            return nextRow;
+            const labels = [...row.labels];
+            labels[colIndex] = value;
+            return { ...row, labels, labelType: "manual" as const };
         });
         updateRows(nextRows);
     };
     const addColumn = (rowIndex: number) => {
         const nextRows = rows.map((row, index) =>
-            index === rowIndex ? [...row, ""] : row,
+            index === rowIndex
+                ? {
+                      ...row,
+                      labels:
+                          row.labelType === "manual"
+                              ? [...row.labels, ""]
+                              : createSubQuestionLabels(
+                                    row.labelType,
+                                    row.labels.length + 1,
+                                ),
+                  }
+                : row,
         );
         updateRows(nextRows);
     };
     const removeColumn = (rowIndex: number, colIndex: number) => {
         const nextRows = rows.map((row, index) => {
             if (index !== rowIndex) return row;
-            if (row.length <= 1) return row;
-            return row.filter((_, columnIndex) => columnIndex !== colIndex);
+            if (row.labels.length <= 1) return row;
+            const labels = row.labels.filter(
+                (_, columnIndex) => columnIndex !== colIndex,
+            );
+            return {
+                ...row,
+                labels:
+                    row.labelType === "manual"
+                        ? labels
+                        : createSubQuestionLabels(row.labelType, labels.length),
+            };
         });
         updateRows(nextRows);
     };
@@ -145,9 +214,6 @@ const GroupNodeEditor: React.FC<{
                         className="w-full px-2 py-1.5 border border-slate-300 rounded bg-white"
                     >
                         <option value="sub_parens">小問複合枠</option>
-                        <option value="grid">等分割グリッド</option>
-                        <option value="circle_comma">丸数字区分</option>
-                        <option value="split_2">左右2分割</option>
                         <option value="essay">記述欄</option>
                     </select>
 
@@ -159,7 +225,15 @@ const GroupNodeEditor: React.FC<{
                                 </span>
                                 <button
                                     type="button"
-                                    onClick={() => updateRows([...rows, [""]])}
+                                    onClick={() =>
+                                        updateRows([
+                                            ...rows,
+                                            {
+                                                labels: [""],
+                                                labelType: "manual",
+                                            },
+                                        ])
+                                    }
                                     className="px-1.5 py-0.5 text-[10px] text-indigo-700 border border-indigo-200 rounded"
                                 >
                                     ＋行
@@ -175,6 +249,29 @@ const GroupNodeEditor: React.FC<{
                                             {rowIndex + 1}行
                                         </span>
                                         <div className="flex items-center gap-1">
+                                            <select
+                                                aria-label={`小問${group.label} ${rowIndex + 1}行目のラベル形式`}
+                                                value={row.labelType}
+                                                onChange={(e) =>
+                                                    updateLabelType(
+                                                        rowIndex,
+                                                        e.target
+                                                            .value as SubQuestionLabelType,
+                                                    )
+                                                }
+                                                className="px-1.5 py-0.5 text-[10px] border border-slate-300 rounded bg-white"
+                                            >
+                                                {SUB_QUESTION_LABEL_OPTIONS.map(
+                                                    (option) => (
+                                                        <option
+                                                            key={option.value}
+                                                            value={option.value}
+                                                        >
+                                                            {option.label}
+                                                        </option>
+                                                    ),
+                                                )}
+                                            </select>
                                             <button
                                                 type="button"
                                                 onClick={() =>
@@ -204,7 +301,7 @@ const GroupNodeEditor: React.FC<{
                                         </div>
                                     </div>
                                     <div className="flex flex-wrap items-center gap-1.5">
-                                        {row.map((label, colIndex) => (
+                                        {row.labels.map((label, colIndex) => (
                                             <div
                                                 key={`sub-col-${rowIndex}-${colIndex}`}
                                                 className="flex items-center gap-0.5"
@@ -223,7 +320,7 @@ const GroupNodeEditor: React.FC<{
                                                     className="w-16 px-1.5 py-1 border border-slate-300 rounded text-center font-mono bg-white"
                                                     placeholder="(a)"
                                                 />
-                                                {row.length > 1 && (
+                                                {row.labels.length > 1 && (
                                                     <button
                                                         type="button"
                                                         aria-label={`${rowIndex + 1}行 ${colIndex + 1}列を削除`}
@@ -246,62 +343,238 @@ const GroupNodeEditor: React.FC<{
                         </div>
                     )}
 
-                    {pattern === "grid" && (
-                        <div className="grid grid-cols-2 gap-1.5">
-                            <input
-                                type="number"
-                                min={1}
-                                value={group.gridRows || 1}
-                                onChange={(e) =>
-                                    update({
-                                        gridRows: Number(e.target.value) || 1,
-                                    })
-                                }
-                                className="px-1.5 py-1 border border-slate-300 rounded text-center"
-                                placeholder="行数"
-                            />
-                            <input
-                                type="number"
-                                min={1}
-                                value={group.gridCols || 1}
-                                onChange={(e) =>
-                                    update({
-                                        gridCols: Number(e.target.value) || 1,
-                                    })
-                                }
-                                className="px-1.5 py-1 border border-slate-300 rounded text-center"
-                                placeholder="列数"
-                            />
+                    {pattern === "sub_parens" && (
+                        <div className="space-y-1 text-[10px] text-slate-600">
+                            <label className="flex items-center gap-1">
+                                <input
+                                    type="checkbox"
+                                    checked={group.subCommaEnabled ?? false}
+                                    onChange={(e) =>
+                                        update({
+                                            subCommaEnabled: e.target.checked,
+                                        })
+                                    }
+                                />
+                                「,」で区切る
+                            </label>
+                            <label className="flex items-center gap-1">
+                                カンマ数
+                                <input
+                                    type="number"
+                                    min={1}
+                                    max={20}
+                                    value={Math.max(
+                                        1,
+                                        Number(group.subCommaCount) || 1,
+                                    )}
+                                    disabled={!group.subCommaEnabled}
+                                    onChange={(e) =>
+                                        update({
+                                            subCommaCount: Math.min(
+                                                20,
+                                                Math.max(
+                                                    1,
+                                                    Number(e.target.value) || 1,
+                                                ),
+                                            ),
+                                        })
+                                    }
+                                    className="w-14 px-1 py-0.5 border border-slate-300 rounded text-center disabled:bg-slate-100"
+                                />
+                            </label>
+                            <label className="flex items-center gap-1">
+                                <input
+                                    type="checkbox"
+                                    checked={group.subCommaPaddingAuto ?? true}
+                                    disabled={!group.subCommaEnabled}
+                                    onChange={(e) =>
+                                        update({
+                                            subCommaPaddingAuto: e.target.checked,
+                                        })
+                                    }
+                                />
+                                位置を自動調整
+                            </label>
+                            {Math.max(
+                                1,
+                                Number(group.subCommaCount) || 1,
+                            ) === 1 ? (
+                                <label className="flex items-center gap-1">
+                                    カンマ位置（%）
+                                    <input
+                                        type="number"
+                                        min={5}
+                                        max={95}
+                                        value={Math.round(
+                                            ((group.subCommaPaddingAuto ??
+                                            true)
+                                                ? 0.45
+                                                : (group.subCommaPaddingRatio ??
+                                                  0.45)) * 100,
+                                        )}
+                                        disabled={
+                                            !group.subCommaEnabled ||
+                                            (group.subCommaPaddingAuto ?? true)
+                                        }
+                                        onChange={(e) =>
+                                            update({
+                                                subCommaPaddingAuto: false,
+                                                subCommaPaddingRatio: Math.min(
+                                                    0.95,
+                                                    Math.max(
+                                                        0.05,
+                                                        (Number(
+                                                            e.target.value,
+                                                        ) || 5) / 100,
+                                                    ),
+                                                ),
+                                            })
+                                        }
+                                        className="w-14 px-1 py-0.5 border border-slate-300 rounded text-center disabled:bg-slate-100"
+                                    />
+                                </label>
+                            ) : (
+                                <span className="text-slate-500">
+                                    カンマはセル全体に等間隔で配置
+                                </span>
+                            )}
                         </div>
                     )}
 
-                    {pattern === "circle_comma" && (
-                        <label className="flex items-center gap-1 text-[10px] text-slate-600">
-                            <input
-                                type="checkbox"
-                                checked={group.circleCommaEnabled ?? false}
-                                onChange={(e) =>
-                                    update({
-                                        circleCommaEnabled: e.target.checked,
-                                    })
-                                }
-                            />
-                            「,」で区切る
-                        </label>
-                    )}
-
-                    {pattern === "split_2" && (
-                        <select
-                            value={group.splitRatio || "50:50"}
-                            onChange={(e) =>
-                                update({ splitRatio: e.target.value })
-                            }
-                            className="w-full px-2 py-1 border border-slate-300 rounded bg-white"
-                        >
-                            <option value="50:50">50 : 50</option>
-                            <option value="30:70">30 : 70</option>
-                            <option value="70:30">70 : 30</option>
-                        </select>
+                    {pattern === "essay" && (
+                        <div className="space-y-1.5 text-[10px] text-slate-600">
+                            <label className="flex items-center gap-1">
+                                表示方式
+                                <select
+                                    aria-label={`小問${group.label}記述欄表示方式`}
+                                    value={group.essayLayout ?? "line"}
+                                    onChange={(e) =>
+                                        update({
+                                            essayLayout: e.target.value as
+                                                | "line"
+                                                | "grid",
+                                        })
+                                    }
+                                    className="px-1.5 py-0.5 border border-slate-300 rounded bg-white"
+                                >
+                                    <option value="line">通常記述欄</option>
+                                    <option value="grid">マス目方式</option>
+                                </select>
+                            </label>
+                            <div className="grid grid-cols-2 gap-1.5">
+                                <label className="flex items-center gap-1">
+                                    行数
+                                    <input
+                                        type="number"
+                                        min={1}
+                                        max={50}
+                                        value={group.essayRows ?? 1}
+                                        onChange={(e) =>
+                                            update({
+                                                essayRows: Math.max(
+                                                    1,
+                                                    Number(e.target.value) || 1,
+                                                ),
+                                            })
+                                        }
+                                        className="w-14 px-1 py-0.5 border border-slate-300 rounded text-center"
+                                    />
+                                </label>
+                                {(group.essayLayout ?? "line") === "grid" && (
+                                    <>
+                                        <label className="flex items-center gap-1">
+                                            列数
+                                            <input
+                                                type="number"
+                                                min={1}
+                                                max={50}
+                                                value={group.essayCols ?? 1}
+                                                onChange={(e) => {
+                                                    const cols = Math.max(
+                                                        1,
+                                                        Number(
+                                                            e.target.value,
+                                                        ) || 1,
+                                                    );
+                                                    update({
+                                                        essayCols: cols,
+                                                        essayCellCount: Math.min(
+                                                            group.essayCellCount ??
+                                                                1,
+                                                            (group.essayRows ??
+                                                                1) * cols,
+                                                        ),
+                                                    });
+                                                }}
+                                                className="w-14 px-1 py-0.5 border border-slate-300 rounded text-center"
+                                            />
+                                        </label>
+                                        <label className="flex items-center gap-1">
+                                            マス数
+                                            <input
+                                                type="number"
+                                                min={1}
+                                                max={2500}
+                                                value={Math.min(
+                                                    group.essayCellCount ??
+                                                        1,
+                                                    (group.essayRows ?? 1) *
+                                                        (group.essayCols ?? 1),
+                                                )}
+                                                onChange={(e) =>
+                                                    update({
+                                                        essayCellCount: Math.min(
+                                                            (group.essayRows ??
+                                                                1) *
+                                                                (group.essayCols ??
+                                                                    1),
+                                                            Math.max(
+                                                                1,
+                                                                Number(
+                                                                    e.target
+                                                                        .value,
+                                                                ) || 1,
+                                                            ),
+                                                        ),
+                                                    })
+                                                }
+                                                className="w-14 px-1 py-0.5 border border-slate-300 rounded text-center"
+                                            />
+                                        </label>
+                                        <label className="flex items-center gap-1">
+                                            列幅
+                                            <input
+                                                type="number"
+                                                min={1}
+                                                max={1000}
+                                                placeholder="自動"
+                                                value={
+                                                    group.essayColumnWidth ??
+                                                    ""
+                                                }
+                                                onChange={(e) =>
+                                                    update({
+                                                        essayColumnWidth:
+                                                            e.target.value
+                                                                ? Math.max(
+                                                                      1,
+                                                                      Number(
+                                                                          e
+                                                                              .target
+                                                                              .value,
+                                                                      ) || 1,
+                                                                  )
+                                                                : undefined,
+                                                    })
+                                                }
+                                                className="w-16 px-1 py-0.5 border border-slate-300 rounded text-center"
+                                            />
+                                            px
+                                        </label>
+                                    </>
+                                )}
+                            </div>
+                        </div>
                     )}
 
                     {group.unclassifiedLabels?.length ? (

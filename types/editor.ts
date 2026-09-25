@@ -21,8 +21,23 @@ export interface SubQuestionCell {
     type: SubQuestionCellType;
 }
 
+export type SubQuestionLabelType =
+    | "circle"
+    | "kana"
+    | "halfwidth_kana"
+    | "hiragana"
+    | "iroha"
+    | "alpha"
+    | "alpha_upper"
+    | "number"
+    | "roman_lower"
+    | "roman_upper"
+    | "none"
+    | "manual";
+
 export interface SubQuestionRowConfig {
     labels: string[];
+    labelType?: SubQuestionLabelType;
 }
 
 export interface SubQuestionGroup {
@@ -45,6 +60,24 @@ export interface SubQuestionGroup {
     circleCommaEnabled?: boolean;
     circleCommaPaddingAuto?: boolean;
     circleCommaPaddingRatio?: number;
+    /** 小問複合枠のセル右端にカンマを表示する */
+    subCommaEnabled?: boolean;
+    /** 小問複合枠の各セルに表示するカンマ数 */
+    subCommaCount?: number;
+    /** 小問複合枠のカンマ位置を列数に応じて自動調整する */
+    subCommaPaddingAuto?: boolean;
+    /** 小問複合枠の手動カンマ位置・複数時の間隔（セル幅に対する比率） */
+    subCommaPaddingRatio?: number;
+    /** 記述欄の表示方式。未指定時は従来の単一記述欄 */
+    essayLayout?: "line" | "grid";
+    /** 記述欄の行数 */
+    essayRows?: number;
+    /** 記述欄マス目方式の列数 */
+    essayCols?: number;
+    /** 記述欄マス目方式で表示するマス数 */
+    essayCellCount?: number;
+    /** 記述欄マス目方式の列幅（px）。未指定時は自動計算 */
+    essayColumnWidth?: number;
     splitRatio?: "50:50" | "30:70" | "70:30" | string;
     /** 旧 grouped 形式。読み込み時に sub_parens へ変換する */
     cells?: SubQuestionCell[];
@@ -98,13 +131,17 @@ export interface NameboxConfig {
     width: number;
     height: number;
     labels: [string, string, string, string];
+    /** 第1〜3欄の幅（px）。第4欄（氏名）は全体幅の残り。 */
+    columnWidths?: [number, number, number];
 }
 
 export interface ScoreTableConfig {
     width: number;
     height: number;
-    colHeaders: [string, string, string];
-    maxScores: [string, string, string];
+    colHeaders: string[];
+    maxScores: string[];
+    /** [観点名行, 配点行] の高さ（px）。未指定時は総高さを50:50で分割。 */
+    rowHeights?: [number, number];
 }
 
 export interface ShortAnswerOptions {

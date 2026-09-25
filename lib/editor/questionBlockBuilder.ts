@@ -203,29 +203,13 @@ const DEFAULT_GROUPED_GROUPS: SubQuestionGroup[] = [
     {
         label: "1",
         height: 42,
-        pattern: "grid",
-        gridRows: 1,
-        gridCols: 1,
-        cells: [{ label: "", widthRatio: 1, type: "box" }],
-    },
-    {
-        label: "2",
-        height: 42,
         pattern: "sub_parens",
-        subRows: 1,
-        subCols: 3,
-        subLabels: ["(a)", "(b)", "(c)"],
-        cells: [
-            { label: "(a)", widthRatio: 1, type: "box" },
-            { label: "(b)", widthRatio: 1, type: "box" },
-            { label: "(c)", widthRatio: 1, type: "box" },
+        subRowConfigs: [
+            {
+                labels: ["①", "②"],
+                labelType: "circle",
+            },
         ],
-    },
-    {
-        label: "3",
-        height: 42,
-        pattern: "essay",
-        cells: [{ label: "", widthRatio: 1, type: "essay" }],
     },
 ];
 
@@ -330,7 +314,36 @@ function resolveGroupRows(group: SubQuestionGroup): number {
     if (resolveGroupPattern(group) === "circle_comma") {
         return Math.max(1, Number(group.circleRows) || 1);
     }
+    if (resolveGroupPattern(group) === "essay") {
+        return Math.max(1, Number(group.essayRows) || 1);
+    }
     return 1;
+}
+
+function resolveEssayGrid(
+    group: SubQuestionGroup,
+    width: number,
+): {
+    rows: number;
+    cols: number;
+    cellCount: number;
+    cellWidth: number;
+} {
+    const rows = Math.max(1, Number(group.essayRows) || 1);
+    const cols = Math.max(1, Number(group.essayCols) || 1);
+    const maxCells = rows * cols;
+    const cellCount = Math.min(
+        maxCells,
+        Math.max(1, Number(group.essayCellCount) || maxCells),
+    );
+    const specifiedWidth = Number(group.essayColumnWidth);
+    return {
+        rows,
+        cols,
+        cellCount,
+        cellWidth:
+            specifiedWidth > 0 ? specifiedWidth : Math.max(1, width / cols),
+    };
 }
 
 function resolveGroupedCommaPadding(
@@ -352,6 +365,43 @@ function resolveGroupedCommaPadding(
     return Math.max(5, cellWidth * ratio);
 }
 
+function resolveSubCommaPadding(
+    group: SubQuestionGroup,
+    cols: number,
+    cellWidth: number,
+): number {
+    const ratio =
+        group.subCommaPaddingAuto !== false
+            ? getDefaultCircleCommaPaddingRatio(cols)
+            : Math.min(
+                  0.95,
+                  Math.max(
+                      0.05,
+                      group.subCommaPaddingRatio ??
+                          getDefaultCircleCommaPaddingRatio(cols),
+                  ),
+              );
+    return Math.max(5, cellWidth * ratio);
+}
+
+function resolveSubCommaPositions(
+    group: SubQuestionGroup,
+    cols: number,
+    cellWidth: number,
+): number[] {
+    const count = Math.max(1, Number(group.subCommaCount) || 1);
+    const rightPadding = resolveSubCommaPadding(group, cols, cellWidth);
+
+    if (count === 1) {
+        return [cellWidth - rightPadding];
+    }
+
+    return Array.from(
+        { length: count },
+        (_, index) => (cellWidth * (index + 1)) / (count + 1),
+    );
+}
+
 function addGroupedPatternFabric(
     items: fabric.Object[],
     group: SubQuestionGroup,
@@ -365,17 +415,38 @@ function addGroupedPatternFabric(
     const rowHeight = height / rows;
 
     if (pattern === "essay") {
-        items.push(
-            new fabric.Rect({
-                left: x,
-                top: y,
-                width,
-                height,
-                fill: "transparent",
-                stroke: "#000000",
-                strokeWidth: 1,
-            }),
-        );
+        const essayLayout = resolveEssayGrid(group, width);
+        if ((group.essayLayout ?? "line") === "grid") {
+            for (let index = 0; index < essayLayout.cellCount; index++) {
+                const row = Math.floor(index / essayLayout.cols);
+                const col = index % essayLayout.cols;
+                items.push(
+                    new fabric.Rect({
+                        left: x + col * essayLayout.cellWidth,
+                        top: y + row * rowHeight,
+                        width: essayLayout.cellWidth,
+                        height: rowHeight,
+                        fill: "transparent",
+                        stroke: "#000000",
+                        strokeWidth: 1,
+                    }),
+                );
+            }
+        } else {
+            for (let row = 0; row < essayLayout.rows; row++) {
+                items.push(
+                    new fabric.Rect({
+                        left: x,
+                        top: y + row * rowHeight,
+                        width,
+                        height: rowHeight,
+                        fill: "transparent",
+                        stroke: "#000000",
+                        strokeWidth: 1,
+                    }),
+                );
+            }
+        }
         return;
     }
 
@@ -452,6 +523,25 @@ function addGroupedPatternFabric(
                             fill: "#000000",
                         }),
                     );
+                }
+                if (group.subCommaEnabled) {
+                    for (const commaX of resolveSubCommaPositions(
+                        group,
+                        cols,
+                        cellWidth,
+                    )) {
+                        items.push(
+                            new fabric.Text(",", {
+                                left: cellX + commaX,
+                                top: cellY + rowHeight / 2,
+                                originX: "center",
+                                originY: "center",
+                                fontFamily: "'Noto Sans JP', sans-serif",
+                                fontSize: 12,
+                                fill: "#000000",
+                            }),
+                        );
+                    }
                 }
             });
         });
@@ -574,7 +664,28 @@ function drawGroupedPatternCanvas(
     const rowHeight = height / rows;
 
     if (pattern === "essay") {
-        ctx.strokeRect(x, y, width, height);
+        const essayLayout = resolveEssayGrid(group, width);
+        if ((group.essayLayout ?? "line") === "grid") {
+            for (let index = 0; index < essayLayout.cellCount; index++) {
+                const row = Math.floor(index / essayLayout.cols);
+                const col = index % essayLayout.cols;
+                ctx.strokeRect(
+                    x + col * essayLayout.cellWidth,
+                    y + row * rowHeight,
+                    essayLayout.cellWidth,
+                    rowHeight,
+                );
+            }
+        } else {
+            for (let row = 0; row < essayLayout.rows; row++) {
+                ctx.strokeRect(
+                    x,
+                    y + row * rowHeight,
+                    width,
+                    rowHeight,
+                );
+            }
+        }
         return;
     }
     if (pattern === "split_2") {
@@ -612,6 +723,23 @@ function drawGroupedPatternCanvas(
                         cellX + tagWidth / 2,
                         cellY + rowHeight / 2,
                     );
+                }
+                if (group.subCommaEnabled) {
+                    ctx.fillStyle = "#000000";
+                    ctx.font = "12px 'Noto Sans JP', sans-serif";
+                    ctx.textAlign = "center";
+                    ctx.textBaseline = "middle";
+                    for (const commaX of resolveSubCommaPositions(
+                        group,
+                        cols,
+                        cellWidth,
+                    )) {
+                        ctx.fillText(
+                            ",",
+                            cellX + commaX,
+                            cellY + rowHeight / 2,
+                        );
+                    }
                 }
             });
         });
@@ -907,11 +1035,16 @@ export function createQuestionBlock(
 
         for (const row of layout.rows) {
             const y = tableTop + row.y;
+            const isEssayGrid =
+                row.group.pattern === "essay" &&
+                (row.group.essayLayout ?? "line") === "grid";
             items.push(
                 new fabric.Rect({
                     left: 0,
                     top: y,
-                    width: layout.blockWidth,
+                    width: isEssayGrid
+                        ? row.labelWidth
+                        : layout.blockWidth,
                     height: row.height,
                     fill: "transparent",
                     stroke: "#000000",
@@ -931,7 +1064,7 @@ export function createQuestionBlock(
                     }),
                 );
             }
-            if (row.labelWidth > 0) {
+            if (row.labelWidth > 0 && !isEssayGrid) {
                 items.push(
                     new fabric.Line(
                         [row.labelWidth, y, row.labelWidth, y + row.height],
@@ -1108,8 +1241,16 @@ export function drawModalPreviewCanvas(
         const layout = buildGroupedLayout(cfg, resolvedWidth);
         for (const row of layout.rows) {
             const y = tableTop + row.y;
-            ctx.strokeRect(0, y, layout.blockWidth, row.height);
-            if (row.labelWidth > 0) {
+            const isEssayGrid =
+                row.group.pattern === "essay" &&
+                (row.group.essayLayout ?? "line") === "grid";
+            ctx.strokeRect(
+                0,
+                y,
+                isEssayGrid ? row.labelWidth : layout.blockWidth,
+                row.height,
+            );
+            if (row.labelWidth > 0 && !isEssayGrid) {
                 ctx.beginPath();
                 ctx.moveTo(row.labelWidth, y);
                 ctx.lineTo(row.labelWidth, y + row.height);
