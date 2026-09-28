@@ -37,7 +37,7 @@ export function EditorToolbar({
                     onOpenImportModal={creation.onOpenImportModal}
                     onAddHeader={creation.onAddHeader}
                     onAddNamebox={creation.onAddNamebox}
-                    onAddScoretable={creation.onAddScoretable}
+                    onAddScoreTable={creation.onAddScoreTable}
                 />
                 <div className="h-5 w-px bg-slate-300 mx-1"></div>
                 <BlockOperationButtons

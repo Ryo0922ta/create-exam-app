@@ -12,7 +12,7 @@ export interface CreationActions {
     onOpenImportModal: () => void;
     onAddHeader: () => void;
     onAddNamebox: () => void;
-    onAddScoretable: () => void;
+    onAddScoreTable: () => void;
 }
 
 export interface BlockOperations {

@@ -1,6 +1,6 @@
 import type { CreationButtonsProps } from "./types";
 
-export function CreationButtons({ onOpenQuestionModal, onOpenImportModal, onAddHeader, onAddNamebox, onAddScoretable }: CreationButtonsProps) {
+export function CreationButtons({ onOpenQuestionModal, onOpenImportModal, onAddHeader, onAddNamebox, onAddScoreTable }: CreationButtonsProps) {
     return (
         <>
             <button type="button" onClick={onOpenQuestionModal} className="px-3 py-1.5 text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white rounded shadow-xs flex items-center gap-1.5 transition">
@@ -15,7 +15,7 @@ export function CreationButtons({ onOpenQuestionModal, onOpenImportModal, onAddH
             <span className="text-[11px] font-semibold text-slate-500">基本パーツ:</span>
             <button type="button" onClick={onAddHeader} className="px-2.5 py-1 text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 rounded border border-slate-300 font-medium transition flex items-center gap-1"><span>+ 考査見出し枠</span></button>
             <button type="button" onClick={onAddNamebox} className="px-2.5 py-1 text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 rounded border border-slate-300 font-medium transition flex items-center gap-1"><span>+ 年組氏名欄</span></button>
-            <button type="button" onClick={onAddScoretable} className="px-2.5 py-1 text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 rounded border border-slate-300 font-medium transition flex items-center gap-1"><span>+ 観点別得点枠</span></button>
+            <button type="button" onClick={onAddScoreTable} className="px-2.5 py-1 text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 rounded border border-slate-300 font-medium transition flex items-center gap-1"><span>+ 観点別得点枠</span></button>
         </>
     );
 }

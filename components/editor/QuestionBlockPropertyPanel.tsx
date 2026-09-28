@@ -16,15 +16,13 @@ export type { CustomFabricBlock } from "./question-property-panel/types";
 
 export const QuestionBlockPropertyPanel = ({
     selectedBlock,
-    onUpdate,
     onUpdateQuestion,
     onUpdateExamHeader,
     onUpdateNamebox,
     onUpdateScoreTable,
     onClose,
 }: QuestionBlockPropertyPanelProps) => {
-    const customType = (selectedBlock as any)?.customType;
-    const handleQuestionUpdate = onUpdateQuestion || onUpdate;
+    const customType = selectedBlock?.customType;
 
     if (!selectedBlock) return null;
 
@@ -58,7 +56,7 @@ export const QuestionBlockPropertyPanel = ({
             {(customType === "question-block" || !customType) && (
                 <QuestionBlockForm
                     block={selectedBlock as CustomQuestionBlockGroup}
-                    onUpdate={handleQuestionUpdate}
+                    onUpdate={onUpdateQuestion}
                     onClose={onClose}
                 />
             )}

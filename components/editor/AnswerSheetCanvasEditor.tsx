@@ -7,20 +7,18 @@ import React, {
     useCallback,
     useMemo,
 } from "react";
-import Link from "next/link";
 import { fabric } from "fabric";
 import {
     DEFAULT_PAPER_MARGINS,
-    QuestionBlockConfig,
-    ExamHeaderConfig,
-    NameboxConfig,
-    ScoreTableConfig,
+    type QuestionBlockConfig,
+    type ExamHeaderConfig,
+    type NameboxConfig,
+    type ScoreTableConfig,
 } from "@/types/editor";
 import {
     PAPER_SIZES,
     GRID_MAJOR_CELL_COUNT,
     getGridCellSizePx,
-    SECTION_STANDARD_WIDTH,
 } from "@/lib/editor/paperSizes";
 
 const GRID_CELL_SIZE_PX = {
@@ -29,7 +27,7 @@ const GRID_CELL_SIZE_PX = {
 };
 import {
     createQuestionBlock,
-    CustomQuestionBlockGroup,
+    type CustomQuestionBlockGroup,
 } from "@/lib/editor/questionBlockBuilder";
 import {
     createExamHeaderBlock,
@@ -38,9 +36,9 @@ import {
     DEFAULT_EXAM_HEADER_CONFIG,
     DEFAULT_NAMEBOX_CONFIG,
     DEFAULT_SCORE_TABLE_CONFIG,
-    CustomExamHeaderGroup,
-    CustomNameboxGroup,
-    CustomScoreTableGroup,
+    type CustomExamHeaderGroup,
+    type CustomNameboxGroup,
+    type CustomScoreTableGroup,
 } from "@/lib/editor/basicPartBuilder";
 import { exportB4LandscapePdf, exportA4SplitPdf } from "@/lib/editor/exportPdf";
 import { exportB4WordDocx } from "@/lib/editor/exportWord";
@@ -55,17 +53,24 @@ import {
     computeMarginRegions,
 } from "@/lib/editor/marginGuides";
 import { EditorToolbar } from "./EditorToolbar";
-import { QuestionEditModal } from "./modals/QuestionEditModal";
-import { ImportTextModal } from "./modals/ImportTextModal";
-import { BatchReplaceModal } from "./modals/BatchReplaceModal";
-import {
-    QuestionBlockPropertyPanel,
+import { EditorHeader } from "./EditorHeader";
+import { CanvasWorkspace } from "./CanvasWorkspace";
+import { EditorModals } from "./EditorModals";
+import { QuestionBlockPropertyPanel } from "./QuestionBlockPropertyPanel";
+import type {
+    BlockOperations,
+    CreationActions,
+    ViewOptions,
+} from "./toolbar/types";
+import type {
     CustomFabricBlock,
-} from "./QuestionBlockPropertyPanel";
+    EditableBlockType,
+    QuestionBlockPropertyPanelProps,
+} from "./question-property-panel/types";
 
 function isEditableBlock(
     obj: fabric.Object | null | undefined,
-): obj is CustomFabricBlock {
+): obj is CustomFabricBlock & { customType: EditableBlockType } {
     if (!obj) return false;
     const block = obj as CustomFabricBlock;
     return (
@@ -76,7 +81,13 @@ function isEditableBlock(
     );
 }
 
-export const AnswerSheetCanvasEditor: React.FC = () => {
+function isQuestionBlock(
+    obj: fabric.Object | null | undefined,
+): obj is CustomFabricBlock & { customType: "question-block" } {
+    return isEditableBlock(obj) && obj.customType === "question-block";
+}
+
+export function AnswerSheetCanvasEditor() {
     const fabricHostRef = useRef<HTMLDivElement | null>(null); //canvasを配置するdiv
     const fabricCanvasRef = useRef<fabric.Canvas | null>(null); // 作成したcanvasインスタンス
     const containerWrapRef = useRef<HTMLDivElement | null>(null);//表示領域
@@ -366,6 +377,28 @@ export const AnswerSheetCanvasEditor: React.FC = () => {
         setIsGridVisible(visible);
     };
 
+    const removeSelectedObjects = useCallback(
+        (message: string) => {
+            const canvas = fabricCanvasRef.current;
+            if (!canvas) return;
+
+            const activeObjects = canvas.getActiveObjects();
+            if (activeObjects.length === 0) return;
+
+            canvas.discardActiveObject();
+            activeObjects.forEach((object) => canvas.remove(object));
+            setQuestionBlockCount(
+                canvas.getObjects().filter(isQuestionBlock).length,
+            );
+            setSelectedBlock(null);
+            selectedBlockRef.current = null;
+            setIsPropertyPanelOpen(false);
+            canvas.requestRenderAll();
+            showToast(message);
+        },
+        [showToast],
+    );
+
     // キーボード削除ショートカット
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -381,34 +414,13 @@ export const AnswerSheetCanvasEditor: React.FC = () => {
             }
 
             if (e.key === "Delete" || e.key === "Backspace") {
-                const canvas = fabricCanvasRef.current;
-                if (!canvas) return;
-
-                const activeObjects = canvas.getActiveObjects();
-                if (activeObjects.length > 0) {
-                    canvas.discardActiveObject();
-                    activeObjects.forEach((obj) => canvas.remove(obj));
-                    setQuestionBlockCount(
-                        canvas
-                            .getObjects()
-                            .filter(
-                                (obj) =>
-                                    (obj as CustomFabricBlock).customType ===
-                                    "question-block",
-                            ).length,
-                    );
-                    setSelectedBlock(null);
-                    selectedBlockRef.current = null;
-                    setIsPropertyPanelOpen(false);
-                    canvas.requestRenderAll();
-                    showToast("選択項目を削除しました");
-                }
+                removeSelectedObjects("選択項目を削除しました");
             }
         };
 
         window.addEventListener("keydown", handleKeyDown);
         return () => window.removeEventListener("keydown", handleKeyDown);
-    }, [showToast]);
+    }, [removeSelectedObjects]);
 
     // 大問作成・更新の適用
     const handleApplyQuestionConfig = (cfg: QuestionBlockConfig) => {
@@ -576,7 +588,7 @@ export const AnswerSheetCanvasEditor: React.FC = () => {
         showToast("年組氏名欄を追加しました");
     };
 
-    const handleAddScoretable = () => {
+    const handleAddScoreTable = () => {
         const canvas = fabricCanvasRef.current;
         if (!canvas) return;
         const group = createScoreTableBlock(
@@ -594,7 +606,7 @@ export const AnswerSheetCanvasEditor: React.FC = () => {
         const canvas = fabricCanvasRef.current;
         const activeObj = canvas?.getActiveObject() as
             | (fabric.Group & {
-                  customType?: string;
+                  customType?: EditableBlockType;
                   questionConfig?: QuestionBlockConfig;
                   examHeaderConfig?: ExamHeaderConfig;
                   nameboxConfig?: NameboxConfig;
@@ -606,7 +618,7 @@ export const AnswerSheetCanvasEditor: React.FC = () => {
         const cloneSource = activeObj as fabric.Object;
         cloneSource.clone((clonedObject: fabric.Object) => {
             const cloned = clonedObject as fabric.Group & {
-                customType?: string;
+                customType?: EditableBlockType;
                 questionConfig?: QuestionBlockConfig;
                 examHeaderConfig?: ExamHeaderConfig;
                 nameboxConfig?: NameboxConfig;
@@ -651,27 +663,7 @@ export const AnswerSheetCanvasEditor: React.FC = () => {
 
     // 削除
     const handleDelete = () => {
-        const canvas = fabricCanvasRef.current;
-        if (!canvas) return;
-        const activeObjects = canvas.getActiveObjects();
-        if (activeObjects.length > 0) {
-            canvas.discardActiveObject();
-            activeObjects.forEach((obj) => canvas.remove(obj));
-            setQuestionBlockCount(
-                canvas
-                    .getObjects()
-                    .filter(
-                        (obj) =>
-                            (obj as CustomFabricBlock).customType ===
-                            "question-block",
-                    ).length,
-            );
-            setSelectedBlock(null);
-            selectedBlockRef.current = null;
-            setIsPropertyPanelOpen(false);
-            canvas.requestRenderAll();
-            showToast("選択枠を削除しました");
-        }
+        removeSelectedObjects("選択枠を削除しました");
     };
 
     // 白紙に戻す
@@ -766,351 +758,129 @@ export const AnswerSheetCanvasEditor: React.FC = () => {
         [paperMargins, b4Config.widthPx, b4Config.heightPx],
     );
 
+    const creationActions: CreationActions = {
+        onOpenQuestionModal: () => {
+            setEditingBlock(null);
+            setIsQuestionModalOpen(true);
+        },
+        onOpenImportModal: () => setIsImportModalOpen(true),
+        onAddHeader: handleAddHeader,
+        onAddNamebox: handleAddNamebox,
+        onAddScoreTable: handleAddScoreTable,
+    };
+
+    const blockOperations: BlockOperations = {
+        onClone: handleClone,
+        onDelete: handleDelete,
+        hasEditableSelection: selectedBlock !== null,
+        isPropertyPanelOpen,
+        onTogglePropertyPanel: handleTogglePropertyPanel,
+    };
+
+    const viewOptions: ViewOptions = {
+        guides: {
+            isGridVisible,
+            onToggleGrid: handleToggleGrid,
+            isSnapEnabled,
+            onToggleSnap: handleToggleSnap,
+            isAlignmentGuidesEnabled,
+            onToggleAlignmentGuides: handleToggleAlignmentGuides,
+            isMarginGuidesVisible,
+            onToggleMarginGuides: setIsMarginGuidesVisible,
+        },
+        margins: {
+            paperMargins,
+            onPaperMarginsChange: setPaperMargins,
+        },
+        zoom: {
+            zoomLevel,
+            onZoomIn: () => applyZoom(zoomLevel + 0.1),
+            onZoomOut: () => applyZoom(zoomLevel - 0.1),
+            onZoomFit: fitCanvasToScreen,
+        },
+    };
+
+    const propertyPanelProps: QuestionBlockPropertyPanelProps = {
+        selectedBlock,
+        onUpdateQuestion: handleUpdateSelectedQuestion,
+        onUpdateExamHeader: handleUpdateSelectedExamHeader,
+        onUpdateNamebox: handleUpdateSelectedNamebox,
+        onUpdateScoreTable: handleUpdateSelectedScoreTable,
+        onClose: handleClosePropertyPanel,
+    };
+
     return (
         <div className="h-screen bg-slate-100 text-slate-800 flex flex-col overflow-hidden font-sans">
-            {/* アプリヘッダー */}
-            <header className="bg-slate-900 text-white px-4 py-2.5 flex items-center justify-between shadow-md z-30 flex-shrink-0 select-none">
-                <div className="flex items-center gap-3">
-                    <Link
-                        href="/"
-                        className="px-2.5 py-1 text-xs font-semibold bg-slate-800 hover:bg-slate-700 rounded transition border border-slate-700 flex items-center gap-1"
-                    >
-                        <svg
-                            className="w-4 h-4"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                        >
-                            <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth="2"
-                                d="M10 19l-7-7m0 0l7-7m-7 7h18"
-                            />
-                        </svg>
-                        CSVプレビュー
-                    </Link>
+            <EditorHeader
+                onOpenBatchReplace={() => setIsReplaceModalOpen(true)}
+                onClear={handleClear}
+                onExportPdfB4={handleExportPdfB4}
+                onExportPdfSplit={handleExportPdfSplit}
+                onExportWord={handleExportWord}
+                isExporting={isExporting}
+                isPdfDropdownOpen={isPdfDropdownOpen}
+                onTogglePdfDropdown={() =>
+                    setIsPdfDropdownOpen((isOpen) => !isOpen)
+                }
+            />
 
-                    <div className="h-4 w-px bg-slate-700"></div>
-
-                    <div className="flex items-center gap-2">
-                        <div className="bg-indigo-600 text-white p-1.5 rounded-lg shadow-xs">
-                            <svg
-                                className="w-5 h-5"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                            >
-                                <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth="2"
-                                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                                />
-                            </svg>
-                        </div>
-                        <div>
-                            <h1 className="text-sm font-bold tracking-wide flex items-center gap-2">
-                                <span>定期考査 解答用紙エディタ</span>
-                                <span className="text-[10px] bg-slate-800 border border-slate-700 text-slate-300 px-2 py-0.5 rounded-full font-normal">
-                                    B4横 (364×257mm)
-                                </span>
-                            </h1>
-                        </div>
-                    </div>
-                </div>
-                {/* 右側アクションボタン */}
-                <div className="flex flex-1 items-center gap-3 min-w-0 justify-end">
-                    <div className="flex items-center gap-3">
-                        <button
-                            type="button"
-                            onClick={() => setIsReplaceModalOpen(true)}
-                            className="px-1 py-1 text-xs font-medium text-slate-400 hover:text-white transition"
-                        >
-                            観点記号の一括置換
-                        </button>
-                        <button
-                            type="button"
-                            onClick={handleClear}
-                            className="px-1 py-1 text-[11px] text-slate-500 hover:text-red-300 transition"
-                        >
-                            白紙に戻す
-                        </button>
-                    </div>
-
-                    <div className="ml-auto flex items-center gap-1.5 shrink-0">
-                        <span className="text-[10px] text-slate-500">出力</span>
-                        {/* PDF保存ドロップダウン */}
-                        <div className="relative">
-                            <button
-                                type="button"
-                                onClick={() =>
-                                    setIsPdfDropdownOpen(!isPdfDropdownOpen)
-                                }
-                                disabled={isExporting}
-                            className="px-3.5 py-1.5 text-xs font-semibold bg-blue-600 hover:bg-blue-500 disabled:bg-blue-400 rounded text-white shadow-xs transition flex items-center gap-1.5"
-                            >
-                                <svg
-                                    className="w-3.5 h-3.5"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                >
-                                    <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        strokeWidth="2"
-                                        d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"
-                                    />
-                                </svg>
-                                <span>PDFに保存</span>
-                                <svg
-                                    className="w-3 h-3"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                >
-                                    <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        strokeWidth="2"
-                                        d="M19 9l-7 7-7-7"
-                                    />
-                                </svg>
-                            </button>
-
-                            {isPdfDropdownOpen && (
-                                <div className="absolute right-0 mt-1 w-56 bg-white text-slate-800 rounded shadow-xl border border-slate-200 py-1 z-40 text-xs animate-in fade-in zoom-in-95 duration-100">
-                                    <button
-                                        type="button"
-                                        onClick={handleExportPdfB4}
-                                    className="w-full text-left px-3.5 py-2 hover:bg-blue-50 text-slate-800 font-medium flex items-center justify-between"
-                                    >
-                                        <span>B4横 (原寸1枚) PDF</span>
-                                    <span className="text-[10px] text-blue-600 bg-blue-100 px-1.5 py-0.5 rounded font-bold">
-                                            推奨
-                                        </span>
-                                    </button>
-                                    <div className="border-t border-slate-200 my-0.5"></div>
-                                    <button
-                                        type="button"
-                                        onClick={handleExportPdfSplit}
-                                    className="w-full text-left px-3.5 py-2 hover:bg-blue-50 text-slate-800 font-medium"
-                                    >
-                                        A4分割 (左面・右面2ページ) PDF
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Word形式保存 */}
-                        <button
-                            type="button"
-                            onClick={handleExportWord}
-                            disabled={isExporting}
-                            className="px-3.5 py-1.5 text-xs font-semibold border border-blue-400 text-blue-100 hover:bg-blue-900/50 disabled:opacity-50 rounded transition flex items-center gap-1.5"
-                        >
-                            <svg
-                                className="w-3.5 h-3.5"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                            >
-                                <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth="2"
-                                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                                />
-                            </svg>
-                            <span>Word形式 (.docx) で保存</span>
-                        </button>
-                    </div>
-                </div>
-            </header>
 
             {/* ツールバー */}
             <EditorToolbar
-                creation={{
-                    onOpenQuestionModal: () => {
-                        setEditingBlock(null);
-                        setIsQuestionModalOpen(true);
-                    },
-                    onOpenImportModal: () => setIsImportModalOpen(true),
-                    onAddHeader: handleAddHeader,
-                    onAddNamebox: handleAddNamebox,
-                    onAddScoretable: handleAddScoretable,
-                }}
-                blockOperations={{
-                    onClone: handleClone,
-                    onDelete: handleDelete,
-                    hasEditableSelection: selectedBlock !== null,
-                    isPropertyPanelOpen,
-                    onTogglePropertyPanel: handleTogglePropertyPanel,
-                }}
-                view={{
-                    guides: {
-                        isGridVisible,
-                        onToggleGrid: handleToggleGrid,
-                        isSnapEnabled,
-                        onToggleSnap: handleToggleSnap,
-                        isAlignmentGuidesEnabled,
-                        onToggleAlignmentGuides:
-                            handleToggleAlignmentGuides,
-                        isMarginGuidesVisible,
-                        onToggleMarginGuides: setIsMarginGuidesVisible,
-                    },
-                    margins: {
-                        paperMargins,
-                        onPaperMarginsChange: setPaperMargins,
-                    },
-                    zoom: {
-                        zoomLevel,
-                        onZoomIn: () => applyZoom(zoomLevel + 0.1),
-                        onZoomOut: () => applyZoom(zoomLevel - 0.1),
-                        onZoomFit: fitCanvasToScreen,
-                    },
-                }}
+                creation={creationActions}
+                blockOperations={blockOperations}
+                view={viewOptions}
             />
 
             {/* メイン編集エリア（キャンバス + プロパティパネル） */}
             <div className="flex-1 flex overflow-hidden relative">
-                {/* キャンバスワークスペース */}
-                <div
-                    ref={containerWrapRef}
-                    className="flex-1 overflow-auto bg-slate-200 p-6 flex items-start justify-center relative"
-                    onClick={() => setIsPdfDropdownOpen(false)}
-                >
-                    <div
-                        className="relative inline-block transition-all"
-                        style={{
-                            width: `${b4Config.widthPx * zoomLevel}px`,
-                            height: `${b4Config.heightPx * zoomLevel}px`,
-                        }}
-                    >
-                        {/* Fabric.js Canvas */}
-                        <div
-                            ref={fabricHostRef}
-                            className={`fabric-canvas-host canvas-shadow rounded-none ${isGridVisible ? "grid-active" : "bg-white"}`}
-                            style={gridHostStyle}
-                        />
-
-                        {/* 中央折り目 / A4分割ガイドライン */}
-                        <div
-                            className="absolute top-0 bottom-0 left-1/2 w-0 border-r-2 border-dashed border-indigo-400/70 pointer-events-none z-10"
-                            style={{ transform: "translateX(-1px)" }}
-                        />
-                        {/* 余白ガイド（編集用・PDF非出力） */}
-                        {isMarginGuidesVisible && (
-                            <>
-                                {[
-                                    marginGuideLines.outerLeft,
-                                    marginGuideLines.foldLeft,
-                                    marginGuideLines.foldRight,
-                                    marginGuideLines.outerRight,
-                                ].map((left, index) => (
-                                    <div
-                                        key={`margin-v-${index}`}
-                                        className="absolute top-0 bottom-0 w-0 border-r border-dashed border-amber-400/70 pointer-events-none z-10"
-                                        style={{
-                                            left: `${(left / b4Config.widthPx) * 100}%`,
-                                        }}
-                                    />
-                                ))}
-                                <div
-                                    className="absolute left-0 right-0 h-0 border-t border-dashed border-amber-400/70 pointer-events-none z-10"
-                                    style={{
-                                        top: `${(marginGuideLines.top / b4Config.heightPx) * 100}%`,
-                                    }}
-                                />
-                                <div
-                                    className="absolute left-0 right-0 h-0 border-t border-dashed border-amber-400/70 pointer-events-none z-10"
-                                    style={{
-                                        top: `${(marginGuideLines.bottom / b4Config.heightPx) * 100}%`,
-                                    }}
-                                />
-                            </>
-                        )}
-
-                        {!hasQuestionBlock && (
-                            <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none">
-                                <div className="pointer-events-auto max-w-sm rounded-xl border border-indigo-200 bg-white/95 p-5 text-center shadow-lg">
-                                    <p className="text-sm font-bold text-slate-800">
-                                        解答用紙を作成しましょう
-                                    </p>
-                                    <p className="mt-1 text-xs leading-relaxed text-slate-500">
-                                        大問を追加して配置を整えたら、PDFまたはWordで保存できます。
-                                    </p>
-                                    <div className="mt-4 grid grid-cols-3 gap-2 text-[10px] text-slate-600">
-                                        <div className="rounded border border-slate-200 bg-slate-50 p-2">
-                                            <span className="block text-sm font-bold text-indigo-600">
-                                                1
-                                            </span>
-                                            大問を作成
-                                        </div>
-                                        <div className="rounded border border-slate-200 bg-slate-50 p-2">
-                                            <span className="block text-sm font-bold text-indigo-600">
-                                                2
-                                            </span>
-                                            配置・調整
-                                        </div>
-                                        <div className="rounded border border-slate-200 bg-slate-50 p-2">
-                                            <span className="block text-sm font-bold text-indigo-600">
-                                                3
-                                            </span>
-                                            保存
-                                        </div>
-                                    </div>
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setEditingBlock(null);
-                                            setIsQuestionModalOpen(true);
-                                        }}
-                                        className="mt-4 rounded bg-indigo-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-indigo-500"
-                                    >
-                                        大問を作成・追加
-                                    </button>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                </div>
+                <CanvasWorkspace
+                    containerRef={containerWrapRef}
+                    fabricHostRef={fabricHostRef}
+                    canvasWidth={b4Config.widthPx * zoomLevel}
+                    canvasHeight={b4Config.heightPx * zoomLevel}
+                    gridHostStyle={gridHostStyle}
+                    isGridVisible={isGridVisible}
+                    isMarginGuidesVisible={isMarginGuidesVisible}
+                    marginGuideLines={marginGuideLines}
+                    hasQuestionBlock={hasQuestionBlock}
+                    onOpenQuestionModal={() => {
+                        setEditingBlock(null);
+                        setIsQuestionModalOpen(true);
+                    }}
+                    onClosePdfDropdown={() => setIsPdfDropdownOpen(false)}
+                />
 
                 {/* プロパティ編集サイドパネル（選択時に自動表示） */}
                 {isPropertyPanelOpen && selectedBlock && (
                     <QuestionBlockPropertyPanel
-                        selectedBlock={selectedBlock}
-                        onUpdateQuestion={handleUpdateSelectedQuestion}
-                        onUpdateExamHeader={handleUpdateSelectedExamHeader}
-                        onUpdateNamebox={handleUpdateSelectedNamebox}
-                        onUpdateScoreTable={handleUpdateSelectedScoreTable}
-                        onClose={handleClosePropertyPanel}
+                        selectedBlock={propertyPanelProps.selectedBlock}
+                        onUpdateQuestion={propertyPanelProps.onUpdateQuestion}
+                        onUpdateExamHeader={
+                            propertyPanelProps.onUpdateExamHeader
+                        }
+                        onUpdateNamebox={propertyPanelProps.onUpdateNamebox}
+                        onUpdateScoreTable={
+                            propertyPanelProps.onUpdateScoreTable
+                        }
+                        onClose={propertyPanelProps.onClose}
                     />
                 )}
             </div>
 
-            {/* モーダル群 */}
-            <QuestionEditModal
-                isOpen={isQuestionModalOpen}
-                initialConfig={editingBlock?.questionConfig || null}
-                onClose={() => {
+            <EditorModals
+                isQuestionModalOpen={isQuestionModalOpen}
+                isImportModalOpen={isImportModalOpen}
+                isReplaceModalOpen={isReplaceModalOpen}
+                editingBlock={editingBlock}
+                onCloseQuestionModal={() => {
                     setIsQuestionModalOpen(false);
                     setEditingBlock(null);
                 }}
-                onApply={handleApplyQuestionConfig}
-            />
-
-            <ImportTextModal
-                isOpen={isImportModalOpen}
-                onClose={() => setIsImportModalOpen(false)}
-                onApply={handleApplyQuestionConfig}
-            />
-
-            <BatchReplaceModal
-                isOpen={isReplaceModalOpen}
-                onClose={() => setIsReplaceModalOpen(false)}
-                onApply={handleApplyBatchReplace}
+                onCloseImportModal={() => setIsImportModalOpen(false)}
+                onCloseReplaceModal={() => setIsReplaceModalOpen(false)}
+                onApplyQuestionConfig={handleApplyQuestionConfig}
+                onApplyBatchReplace={handleApplyBatchReplace}
             />
 
             {/* トースト通知 */}

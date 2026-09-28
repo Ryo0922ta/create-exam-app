@@ -9,13 +9,19 @@ import type {
 } from "@/lib/editor/basicPartBuilder";
 import { fabric } from "fabric";
 
+export type EditableBlockType =
+    | "question-block"
+    | "exam-header"
+    | "namebox"
+    | "score-table";
+
 export type CustomFabricBlock =
     | CustomQuestionBlockGroup
     | CustomExamHeaderGroup
     | CustomNameboxGroup
     | CustomScoreTableGroup
     | (fabric.Group & {
-          customType?: string;
+          customType?: EditableBlockType;
           questionConfig?: QuestionBlockConfig;
           examHeaderConfig?: ExamHeaderConfig;
           nameboxConfig?: NameboxConfig;
@@ -23,14 +29,13 @@ export type CustomFabricBlock =
       });
 
 export interface QuestionUpdateHandlers {
-    onUpdate?: (config: QuestionBlockConfig) => void;
-    onUpdateQuestion?: (config: QuestionBlockConfig) => void;
+    onUpdateQuestion: (config: QuestionBlockConfig) => void;
 }
 
 export interface BasicPartUpdateHandlers {
-    onUpdateExamHeader?: (config: ExamHeaderConfig) => void;
-    onUpdateNamebox?: (config: NameboxConfig) => void;
-    onUpdateScoreTable?: (config: ScoreTableConfig) => void;
+    onUpdateExamHeader: (config: ExamHeaderConfig) => void;
+    onUpdateNamebox: (config: NameboxConfig) => void;
+    onUpdateScoreTable: (config: ScoreTableConfig) => void;
 }
 
 export interface QuestionBlockPropertyPanelProps
@@ -63,4 +68,3 @@ export interface QuestionBlockFormProps {
     onUpdate?: (config: QuestionBlockConfig) => void;
     onClose: () => void;
 }
-
