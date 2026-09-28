@@ -77,15 +77,15 @@ function isEditableBlock(
 }
 
 export const AnswerSheetCanvasEditor: React.FC = () => {
-    const fabricHostRef = useRef<HTMLDivElement | null>(null);
-    const fabricCanvasRef = useRef<fabric.Canvas | null>(null);
-    const containerWrapRef = useRef<HTMLDivElement | null>(null);
-    const snapEnabledRef = useRef(true);
-    const alignmentGuidesEnabledRef = useRef(true);
-    const paperMarginsRef = useRef(DEFAULT_PAPER_MARGINS);
-    const selectedBlockRef = useRef<CustomFabricBlock | null>(null);
-    const isPropertyPanelOpenRef = useRef(false);
-    const suppressSelectionClearRef = useRef(false);
+    const fabricHostRef = useRef<HTMLDivElement | null>(null); //canvasを配置するdiv
+    const fabricCanvasRef = useRef<fabric.Canvas | null>(null); // 作成したcanvasインスタンス
+    const containerWrapRef = useRef<HTMLDivElement | null>(null);//表示領域
+    const snapEnabledRef = useRef(true);//方眼グリッドの状態
+    const alignmentGuidesEnabledRef = useRef(true);//配置ガイドの状態
+    const paperMarginsRef = useRef(DEFAULT_PAPER_MARGINS);//現在の用紙の余白
+    const selectedBlockRef = useRef<CustomFabricBlock | null>(null);//選択中のcanvasインスタンス
+    const isPropertyPanelOpenRef = useRef(false); // プロパティパネル
+    const suppressSelectionClearRef = useRef(false);//一時的に選択解除処理を抑止するためのフラグ
 
     // モーダル表示状態
     const [isQuestionModalOpen, setIsQuestionModalOpen] = useState(false);
@@ -129,6 +129,7 @@ export const AnswerSheetCanvasEditor: React.FC = () => {
 
     const selectEditableBlock = useCallback(
         (block: CustomFabricBlock, options?: { openPanel?: boolean }) => {
+            //キャンバス本体
             const canvas = fabricCanvasRef.current;
             if (!canvas) return;
 

@@ -36,6 +36,7 @@ import {
     SUB_QUESTION_LABEL_OPTIONS,
 } from "@/lib/editor/subQuestionLabels";
 
+//１つのブロックの型
 export type CustomFabricBlock =
     | CustomQuestionBlockGroup
     | CustomExamHeaderGroup

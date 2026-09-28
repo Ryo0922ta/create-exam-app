@@ -1,7 +1,9 @@
 "use client";
 
 import dynamic from "next/dynamic";
-
+//動的import　next.jsは通常サーバー側でもページを準備するが、
+// fabric.jsやcanvasはブラウザに依存する
+//コンポーネントの呼び出し処理をブラウザ側で実行させるために必要
 const AnswerSheetCanvasEditor = dynamic(
     () =>
         import("@/components/editor/AnswerSheetCanvasEditor").then(
