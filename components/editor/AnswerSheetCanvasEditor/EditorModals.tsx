@@ -2,9 +2,9 @@
 
 import type { QuestionBlockConfig } from "@/types/editor";
 import type { CustomQuestionBlockGroup } from "@/lib/editor/questionBlockBuilder";
-import { QuestionEditModal } from "./modals/QuestionEditModal";
-import { ImportTextModal } from "./modals/ImportTextModal";
-import { BatchReplaceModal } from "./modals/BatchReplaceModal";
+import { QuestionEditModal } from "../modals/QuestionEditModal";
+import { ImportTextModal } from "../modals/ImportTextModal";
+import { BatchReplaceModal } from "../modals/BatchReplaceModal";
 
 export interface EditorModalsProps {
     isQuestionModalOpen: boolean;

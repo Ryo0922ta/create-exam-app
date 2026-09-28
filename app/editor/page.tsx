@@ -6,7 +6,7 @@ import dynamic from "next/dynamic";
 //コンポーネントの呼び出し処理をブラウザ側で実行させるために必要
 const AnswerSheetCanvasEditor = dynamic(
     () =>
-        import("@/components/editor/AnswerSheetCanvasEditor").then(
+        import("@/components/editor/AnswerSheetCanvasEditor/AnswerSheetCanvasEditor").then(
             (mod) => mod.AnswerSheetCanvasEditor,
         ),
     {

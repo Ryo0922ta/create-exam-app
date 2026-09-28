@@ -8,12 +8,7 @@ import type {
     CustomScoreTableGroup,
 } from "@/lib/editor/basicPartBuilder";
 import { fabric } from "fabric";
-
-export type EditableBlockType =
-    | "question-block"
-    | "exam-header"
-    | "namebox"
-    | "score-table";
+import type { EditableBlockType } from "../AnswerSheetCanvasEditor/model";
 
 export type CustomFabricBlock =
     | CustomQuestionBlockGroup
