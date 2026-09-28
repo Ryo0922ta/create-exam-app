@@ -7,30 +7,9 @@ import { ViewOptions } from "./toolbar/ViewOptions";
 import type { EditorToolbarProps } from "./toolbar/types";
 
 export function EditorToolbar({
-    onOpenQuestionModal,
-    onOpenImportModal,
-    onAddHeader,
-    onAddNamebox,
-    onAddScoretable,
-    onClone,
-    onDelete,
-    hasEditableSelection,
-    isPropertyPanelOpen,
-    onTogglePropertyPanel,
-    isGridVisible,
-    onToggleGrid,
-    isSnapEnabled,
-    onToggleSnap,
-    isAlignmentGuidesEnabled,
-    onToggleAlignmentGuides,
-    isMarginGuidesVisible,
-    onToggleMarginGuides,
-    paperMargins,
-    onPaperMarginsChange,
-    zoomLevel,
-    onZoomIn,
-    onZoomOut,
-    onZoomFit,
+    creation,
+    blockOperations,
+    view,
 }: EditorToolbarProps) {
     const [isViewOptionsOpen, setIsViewOptionsOpen] = useState(false);
     const [isMarginOptionsOpen, setIsMarginOptionsOpen] = useState(false);
@@ -40,39 +19,39 @@ export function EditorToolbar({
             <ViewOptions
                 isOpen={isViewOptionsOpen}
                 onToggle={() => setIsViewOptionsOpen((open) => !open)}
-                isGridVisible={isGridVisible}
-                onToggleGrid={onToggleGrid}
-                isSnapEnabled={isSnapEnabled}
-                onToggleSnap={onToggleSnap}
-                isAlignmentGuidesEnabled={isAlignmentGuidesEnabled}
-                onToggleAlignmentGuides={onToggleAlignmentGuides}
-                isMarginGuidesVisible={isMarginGuidesVisible}
-                onToggleMarginGuides={onToggleMarginGuides}
-                isMarginOptionsOpen={isMarginOptionsOpen}
-                onToggleMarginOptions={() =>
-                    setIsMarginOptionsOpen((open) => !open)
-                }
-                paperMargins={paperMargins}
-                onPaperMarginsChange={onPaperMarginsChange}
-                zoomLevel={zoomLevel}
-                onZoomIn={onZoomIn}
-                onZoomOut={onZoomOut}
-                onZoomFit={onZoomFit}
+                guides={view.guides}
+                margins={{
+                    paperMargins: view.margins.paperMargins,
+                    onPaperMarginsChange:
+                        view.margins.onPaperMarginsChange,
+                    isOpen: isMarginOptionsOpen,
+                    onToggle: () =>
+                        setIsMarginOptionsOpen((open) => !open),
+                    isMarginGuidesVisible:
+                        view.guides.isMarginGuidesVisible,
+                }}
+                zoom={view.zoom}
             >
                 <CreationButtons
-                    onOpenQuestionModal={onOpenQuestionModal}
-                    onOpenImportModal={onOpenImportModal}
-                    onAddHeader={onAddHeader}
-                    onAddNamebox={onAddNamebox}
-                    onAddScoretable={onAddScoretable}
+                    onOpenQuestionModal={creation.onOpenQuestionModal}
+                    onOpenImportModal={creation.onOpenImportModal}
+                    onAddHeader={creation.onAddHeader}
+                    onAddNamebox={creation.onAddNamebox}
+                    onAddScoretable={creation.onAddScoretable}
                 />
                 <div className="h-5 w-px bg-slate-300 mx-1"></div>
                 <BlockOperationButtons
-                    onClone={onClone}
-                    onDelete={onDelete}
-                    hasEditableSelection={hasEditableSelection}
-                    isPropertyPanelOpen={isPropertyPanelOpen}
-                    onTogglePropertyPanel={onTogglePropertyPanel}
+                    onClone={blockOperations.onClone}
+                    onDelete={blockOperations.onDelete}
+                    hasEditableSelection={
+                        blockOperations.hasEditableSelection
+                    }
+                    isPropertyPanelOpen={
+                        blockOperations.isPropertyPanelOpen
+                    }
+                    onTogglePropertyPanel={
+                        blockOperations.onTogglePropertyPanel
+                    }
                 />
             </ViewOptions>
         </div>

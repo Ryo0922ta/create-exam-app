@@ -757,9 +757,8 @@ export const QuestionEditModal: React.FC<QuestionEditModalProps> = ({
 
                     {pattern === "grouped" && (
                         <GroupedQuestionEditor
-                            groups={groups}
-                            onChange={setGroups}
-                            title="小問グループの設定"
+                            data={{ groups, onChange: setGroups }}
+                            options={{ title: "小問グループの設定" }}
                         />
                     )}
 

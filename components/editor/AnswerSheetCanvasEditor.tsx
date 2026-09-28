@@ -931,33 +931,46 @@ export const AnswerSheetCanvasEditor: React.FC = () => {
 
             {/* ツールバー */}
             <EditorToolbar
-                onOpenQuestionModal={() => {
-                    setEditingBlock(null);
-                    setIsQuestionModalOpen(true);
+                creation={{
+                    onOpenQuestionModal: () => {
+                        setEditingBlock(null);
+                        setIsQuestionModalOpen(true);
+                    },
+                    onOpenImportModal: () => setIsImportModalOpen(true),
+                    onAddHeader: handleAddHeader,
+                    onAddNamebox: handleAddNamebox,
+                    onAddScoretable: handleAddScoretable,
                 }}
-                onOpenImportModal={() => setIsImportModalOpen(true)}
-                onAddHeader={handleAddHeader}
-                onAddNamebox={handleAddNamebox}
-                onAddScoretable={handleAddScoretable}
-                onClone={handleClone}
-                onDelete={handleDelete}
-                hasEditableSelection={selectedBlock !== null}
-                isPropertyPanelOpen={isPropertyPanelOpen}
-                onTogglePropertyPanel={handleTogglePropertyPanel}
-                isGridVisible={isGridVisible}
-                onToggleGrid={handleToggleGrid}
-                isSnapEnabled={isSnapEnabled}
-                onToggleSnap={handleToggleSnap}
-                isAlignmentGuidesEnabled={isAlignmentGuidesEnabled}
-                onToggleAlignmentGuides={handleToggleAlignmentGuides}
-                isMarginGuidesVisible={isMarginGuidesVisible}
-                onToggleMarginGuides={setIsMarginGuidesVisible}
-                paperMargins={paperMargins}
-                onPaperMarginsChange={setPaperMargins}
-                zoomLevel={zoomLevel}
-                onZoomIn={() => applyZoom(zoomLevel + 0.1)}
-                onZoomOut={() => applyZoom(zoomLevel - 0.1)}
-                onZoomFit={fitCanvasToScreen}
+                blockOperations={{
+                    onClone: handleClone,
+                    onDelete: handleDelete,
+                    hasEditableSelection: selectedBlock !== null,
+                    isPropertyPanelOpen,
+                    onTogglePropertyPanel: handleTogglePropertyPanel,
+                }}
+                view={{
+                    guides: {
+                        isGridVisible,
+                        onToggleGrid: handleToggleGrid,
+                        isSnapEnabled,
+                        onToggleSnap: handleToggleSnap,
+                        isAlignmentGuidesEnabled,
+                        onToggleAlignmentGuides:
+                            handleToggleAlignmentGuides,
+                        isMarginGuidesVisible,
+                        onToggleMarginGuides: setIsMarginGuidesVisible,
+                    },
+                    margins: {
+                        paperMargins,
+                        onPaperMarginsChange: setPaperMargins,
+                    },
+                    zoom: {
+                        zoomLevel,
+                        onZoomIn: () => applyZoom(zoomLevel + 0.1),
+                        onZoomOut: () => applyZoom(zoomLevel - 0.1),
+                        onZoomFit: fitCanvasToScreen,
+                    },
+                }}
             />
 
             {/* メイン編集エリア（キャンバス + プロパティパネル） */}

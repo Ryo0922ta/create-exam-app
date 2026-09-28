@@ -224,9 +224,8 @@ export const ImportTextModal: React.FC<ImportTextModalProps> = ({
 
                     {groups.length > 0 && (
                         <GroupedQuestionEditor
-                            groups={groups}
-                            onChange={setGroups}
-                            title="解析された小問グループ"
+                            data={{ groups, onChange: setGroups }}
+                            options={{ title: "解析された小問グループ" }}
                         />
                     )}
 

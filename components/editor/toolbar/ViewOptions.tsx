@@ -2,7 +2,14 @@ import { MarginOptions } from "./MarginOptions";
 import { ZoomControls } from "./ZoomControls";
 import type { ViewOptionsProps } from "./types";
 
-export function ViewOptions({ children, isOpen, onToggle, isGridVisible, onToggleGrid, isSnapEnabled, onToggleSnap, isAlignmentGuidesEnabled, onToggleAlignmentGuides, isMarginGuidesVisible, onToggleMarginGuides, isMarginOptionsOpen, onToggleMarginOptions, paperMargins, onPaperMarginsChange, zoomLevel, onZoomIn, onZoomOut, onZoomFit }: ViewOptionsProps) {
+export function ViewOptions({
+    children,
+    isOpen,
+    onToggle,
+    guides,
+    margins,
+    zoom,
+}: ViewOptionsProps) {
     return (
         <>
             <div className="px-4 py-2 flex flex-wrap items-center justify-between gap-2">
@@ -22,42 +29,42 @@ export function ViewOptions({ children, isOpen, onToggle, isGridVisible, onToggl
             {isOpen && (
                 <div className="px-4 py-2 border-t border-slate-200 flex flex-wrap items-center gap-3">
                     <CheckboxOption
-                        checked={isGridVisible}
-                        onCheckedChange={onToggleGrid}
+                        checked={guides.isGridVisible}
+                        onCheckedChange={guides.onToggleGrid}
                         className="rounded text-indigo-600 focus:ring-indigo-500"
                         label="方眼グリッド"
                     />
                     <CheckboxOption
-                        checked={isSnapEnabled}
-                        onCheckedChange={onToggleSnap}
+                        checked={guides.isSnapEnabled}
+                        onCheckedChange={guides.onToggleSnap}
                         className="rounded text-indigo-600 focus:ring-indigo-500"
                         label="吸着"
                     />
                     <CheckboxOption
-                        checked={isAlignmentGuidesEnabled}
-                        onCheckedChange={onToggleAlignmentGuides}
+                        checked={guides.isAlignmentGuidesEnabled}
+                        onCheckedChange={guides.onToggleAlignmentGuides}
                         className="rounded text-rose-600 focus:ring-rose-500"
                         label="配置ガイド"
                     />
                     <CheckboxOption
-                        checked={isMarginGuidesVisible}
-                        onCheckedChange={onToggleMarginGuides}
+                        checked={guides.isMarginGuidesVisible}
+                        onCheckedChange={guides.onToggleMarginGuides}
                         className="rounded text-amber-600 focus:ring-amber-500"
                         label="余白ガイド"
                     />
                     <MarginOptions
-                        isOpen={isMarginOptionsOpen}
-                        onToggle={onToggleMarginOptions}
-                        isMarginGuidesVisible={isMarginGuidesVisible}
-                        paperMargins={paperMargins}
-                        onPaperMarginsChange={onPaperMarginsChange}
+                        isOpen={margins.isOpen}
+                        onToggle={margins.onToggle}
+                        isMarginGuidesVisible={margins.isMarginGuidesVisible}
+                        paperMargins={margins.paperMargins}
+                        onPaperMarginsChange={margins.onPaperMarginsChange}
                     />
                     <div className="h-5 w-px bg-slate-300"></div>
                     <ZoomControls
-                        zoomLevel={zoomLevel}
-                        onZoomIn={onZoomIn}
-                        onZoomOut={onZoomOut}
-                        onZoomFit={onZoomFit}
+                        zoomLevel={zoom.zoomLevel}
+                        onZoomIn={zoom.onZoomIn}
+                        onZoomOut={zoom.onZoomOut}
+                        onZoomFit={zoom.onZoomFit}
                     />
                 </div>
             )}

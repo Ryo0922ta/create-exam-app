@@ -2,16 +2,28 @@ import type { ReactNode } from "react";
 import type { PaperMargins } from "@/types/editor";
 
 export interface EditorToolbarProps {
+    creation: CreationActions;
+    blockOperations: BlockOperations;
+    view: ViewOptions;
+}
+
+export interface CreationActions {
     onOpenQuestionModal: () => void;
     onOpenImportModal: () => void;
     onAddHeader: () => void;
     onAddNamebox: () => void;
     onAddScoretable: () => void;
+}
+
+export interface BlockOperations {
     onClone: () => void;
     onDelete: () => void;
     hasEditableSelection: boolean;
     isPropertyPanelOpen: boolean;
     onTogglePropertyPanel: () => void;
+}
+
+export interface GuideOptions {
     isGridVisible: boolean;
     onToggleGrid: (visible: boolean) => void;
     isSnapEnabled: boolean;
@@ -20,63 +32,43 @@ export interface EditorToolbarProps {
     onToggleAlignmentGuides: (enabled: boolean) => void;
     isMarginGuidesVisible: boolean;
     onToggleMarginGuides: (visible: boolean) => void;
+}
+
+export interface MarginOptions {
     paperMargins: PaperMargins;
     onPaperMarginsChange: (margins: PaperMargins) => void;
+}
+
+export interface ZoomOptions {
     zoomLevel: number;
     onZoomIn: () => void;
     onZoomOut: () => void;
     onZoomFit: () => void;
 }
 
-export interface CreationButtonsProps {
-    onOpenQuestionModal: () => void;
-    onOpenImportModal: () => void;
-    onAddHeader: () => void;
-    onAddNamebox: () => void;
-    onAddScoretable: () => void;
+export interface ViewOptions {
+    guides: GuideOptions;
+    margins: MarginOptions;
+    zoom: ZoomOptions;
 }
 
-export interface BlockOperationButtonsProps {
-    onClone: () => void;
-    onDelete: () => void;
-    hasEditableSelection: boolean;
-    isPropertyPanelOpen: boolean;
-    onTogglePropertyPanel: () => void;
-}
+export type CreationButtonsProps = CreationActions;
 
-export interface MarginOptionsProps {
+export type BlockOperationButtonsProps = BlockOperations;
+
+export interface MarginOptionsProps extends MarginOptions {
     isOpen: boolean;
     onToggle: () => void;
     isMarginGuidesVisible: boolean;
-    paperMargins: PaperMargins;
-    onPaperMarginsChange: (margins: PaperMargins) => void;
 }
 
-export interface ZoomControlsProps {
-    zoomLevel: number;
-    onZoomIn: () => void;
-    onZoomOut: () => void;
-    onZoomFit: () => void;
-}
+export type ZoomControlsProps = ZoomOptions;
 
 export interface ViewOptionsProps {
     children: ReactNode;
     isOpen: boolean;
     onToggle: () => void;
-    isGridVisible: boolean;
-    onToggleGrid: (visible: boolean) => void;
-    isSnapEnabled: boolean;
-    onToggleSnap: (enabled: boolean) => void;
-    isAlignmentGuidesEnabled: boolean;
-    onToggleAlignmentGuides: (enabled: boolean) => void;
-    isMarginGuidesVisible: boolean;
-    onToggleMarginGuides: (visible: boolean) => void;
-    isMarginOptionsOpen: boolean;
-    onToggleMarginOptions: () => void;
-    paperMargins: PaperMargins;
-    onPaperMarginsChange: (margins: PaperMargins) => void;
-    zoomLevel: number;
-    onZoomIn: () => void;
-    onZoomOut: () => void;
-    onZoomFit: () => void;
+    guides: GuideOptions;
+    margins: MarginOptionsProps;
+    zoom: ZoomOptions;
 }
