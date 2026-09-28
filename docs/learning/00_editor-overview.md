@@ -17,11 +17,11 @@
 - 画面の入口
   [app/editor/page.tsx (line 1)](/Users/sawauchiryouta/Desktop/create-answer-paper-app/app/editor/page.tsx:1)
 - エディタ全体
-  [components/editor/AnswerSheetCanvasEditor.tsx (line 79)](/Users/sawauchiryouta/Desktop/create-answer-paper-app/components/editor/AnswerSheetCanvasEditor.tsx:79)
+  [components/editor/AnswerSheetCanvasEditor/AnswerSheetCanvasEditor.tsx (line 79)](/Users/sawauchiryouta/Desktop/create-answer-paper-app/components/editor/AnswerSheetCanvasEditor/AnswerSheetCanvasEditor.tsx:79)
 - ツールバー
-  [components/editor/EditorToolbar.tsx (line 33)](/Users/sawauchiryouta/Desktop/create-answer-paper-app/components/editor/EditorToolbar.tsx:33)
+  [components/editor/toolbar/EditorToolbar.tsx (line 33)](/Users/sawauchiryouta/Desktop/create-answer-paper-app/components/editor/toolbar/EditorToolbar.tsx:33)
 - プロパティパネル
-  [components/editor/QuestionBlockPropertyPanel.tsx (line 62)](/Users/sawauchiryouta/Desktop/create-answer-paper-app/components/editor/QuestionBlockPropertyPanel.tsx:62)
+  [components/editor/question-property-panel/QuestionBlockPropertyPanel.tsx (line 62)](/Users/sawauchiryouta/Desktop/create-answer-paper-app/components/editor/question-property-panel/QuestionBlockPropertyPanel.tsx:62)
 - 大問作成モーダル
   [components/editor/modals/QuestionEditModal.tsx (line 67)](/Users/sawauchiryouta/Desktop/create-answer-paper-app/components/editor/modals/QuestionEditModal.tsx:67)
 - 問題文インポート
@@ -63,7 +63,7 @@ QuestionBlockPropertyPanel
 - Fabric共通ブロック
   [lib/editor/fabricBlocks.ts (line 91)](/Users/sawauchiryouta/Desktop/create-answer-paper-app/lib/editor/fabricBlocks.ts:91)
 4. stateを持っている場所
-主なstateは [AnswerSheetCanvasEditor.tsx (line 79)](/Users/sawauchiryouta/Desktop/create-answer-paper-app/components/editor/AnswerSheetCanvasEditor.tsx:79) に集まっています。
+主なstateは [AnswerSheetCanvasEditor.tsx (line 79)](/Users/sawauchiryouta/Desktop/create-answer-paper-app/components/editor/AnswerSheetCanvasEditor/AnswerSheetCanvasEditor.tsx:79) に集まっています。
 モーダル関連
 - isQuestionModalOpen
 - isImportModalOpen
@@ -167,11 +167,11 @@ Word出力
 - [lib/editor/exportWord.ts (line 595)](/Users/sawauchiryouta/Desktop/create-answer-paper-app/lib/editor/exportWord.ts:595)
 作業内容はリロードすると消えます。現在は永続保存機能がありません。
 8. 最初に読むべきファイル3つ
-1. [components/editor/AnswerSheetCanvasEditor.tsx (line 79)](/Users/sawauchiryouta/Desktop/create-answer-paper-app/components/editor/AnswerSheetCanvasEditor.tsx:79)
+1. [components/editor/AnswerSheetCanvasEditor/AnswerSheetCanvasEditor.tsx (line 79)](/Users/sawauchiryouta/Desktop/create-answer-paper-app/components/editor/AnswerSheetCanvasEditor/AnswerSheetCanvasEditor.tsx:79)
    エディタ全体の中心です。
 2. [lib/editor/questionBlockBuilder.ts (line 818)](/Users/sawauchiryouta/Desktop/create-answer-paper-app/lib/editor/questionBlockBuilder.ts:818)
    大問の見た目、行列、解答欄をどのように描いているか分かります。
-3. [components/editor/QuestionBlockPropertyPanel.tsx (line 62)](/Users/sawauchiryouta/Desktop/create-answer-paper-app/components/editor/QuestionBlockPropertyPanel.tsx:62)
+3. [components/editor/question-property-panel/QuestionBlockPropertyPanel.tsx (line 62)](/Users/sawauchiryouta/Desktop/create-answer-paper-app/components/editor/question-property-panel/QuestionBlockPropertyPanel.tsx:62)
    設定変更がどのように大問へ反映されるか分かります。
 補助資料として、[docs/TECHNICAL_SPEC.md (line 200)](/Users/sawauchiryouta/Desktop/create-answer-paper-app/docs/TECHNICAL_SPEC.md:200) も有用です。
 9. 今後変更すると影響範囲が大きそうな箇所

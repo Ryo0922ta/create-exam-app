@@ -1,12 +1,12 @@
 "use client";
 
 import type { SubQuestionGroup } from "@/types/editor";
-import { GroupNodeEditor } from "./grouped-question/GroupNodeEditor";
+import { GroupNodeEditor } from "./GroupNodeEditor";
 import {
     createLeafGroup,
     updateGroupAtIndex,
-} from "./grouped-question/model";
-import type { GroupedQuestionEditorProps } from "./types";
+} from "./model";
+import type { GroupedQuestionEditorProps } from "../types";
 
 export const GroupedQuestionEditor = ({
     data,

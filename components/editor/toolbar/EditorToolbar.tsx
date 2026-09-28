@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { BlockOperationButtons } from "./toolbar/BlockOperationButtons";
-import { CreationButtons } from "./toolbar/CreationButtons";
-import { ViewOptions } from "./toolbar/ViewOptions";
-import type { EditorToolbarProps } from "./toolbar/types";
+import { BlockOperationButtons } from "./BlockOperationButtons";
+import { CreationButtons } from "./CreationButtons";
+import { ViewOptions } from "./ViewOptions";
+import type { EditorToolbarProps } from "./types";
 
 export function EditorToolbar({
     creation,

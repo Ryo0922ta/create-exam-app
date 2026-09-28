@@ -12,11 +12,11 @@ import {
 import { exportB4LandscapePdf, exportA4SplitPdf } from "@/lib/editor/exportPdf";
 import { exportB4WordDocx } from "@/lib/editor/exportWord";
 import { computeMarginGuideLines } from "@/lib/editor/marginGuides";
-import { EditorToolbar } from "../EditorToolbar";
+import { EditorToolbar } from "../toolbar/EditorToolbar";
 import { EditorHeader } from "./EditorHeader";
 import { CanvasWorkspace } from "./CanvasWorkspace";
 import { EditorModals } from "./EditorModals";
-import { QuestionBlockPropertyPanel } from "../QuestionBlockPropertyPanel";
+import { QuestionBlockPropertyPanel } from "../question-property-panel/QuestionBlockPropertyPanel";
 import type { QuestionBlockPropertyPanelProps } from "../question-property-panel/types";
 import type { CustomQuestionBlockGroup } from "@/lib/editor/questionBlockBuilder";
 import { useFabricEditor } from "./useFabricEditor";

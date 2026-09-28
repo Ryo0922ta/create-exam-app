@@ -23,7 +23,7 @@ import {
     clampQuestionBlockWidth,
 } from "@/lib/editor/paperSizes";
 import { PAPER_SIZES, B4_LANDSCAPE_MM } from "@/lib/editor/paperSizes";
-import { GroupedQuestionEditor } from "@/components/editor/GroupedQuestionEditor";
+import { GroupedQuestionEditor } from "@/components/editor/grouped-question/GroupedQuestionEditor";
 
 interface QuestionEditModalProps {
     isOpen: boolean;

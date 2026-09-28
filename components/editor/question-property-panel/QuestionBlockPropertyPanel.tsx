@@ -1,18 +1,18 @@
 "use client";
 
-import { ExamHeaderForm } from "./question-property-panel/ExamHeaderForm";
-import { NameboxForm } from "./question-property-panel/NameboxForm";
-import { QuestionBlockForm } from "./question-property-panel/QuestionBlockForm";
-import { ScoreTableForm } from "./question-property-panel/ScoreTableForm";
+import { ExamHeaderForm } from "./ExamHeaderForm";
+import { NameboxForm } from "./NameboxForm";
+import { QuestionBlockForm } from "./QuestionBlockForm";
+import { ScoreTableForm } from "./ScoreTableForm";
 import type { CustomQuestionBlockGroup } from "@/lib/editor/questionBlockBuilder";
 import type {
     CustomExamHeaderGroup,
     CustomNameboxGroup,
     CustomScoreTableGroup,
 } from "@/lib/editor/basicPartBuilder";
-import type { QuestionBlockPropertyPanelProps } from "./question-property-panel/types";
+import type { QuestionBlockPropertyPanelProps } from "./types";
 
-export type { CustomFabricBlock } from "./question-property-panel/types";
+export type { CustomFabricBlock } from "./types";
 
 export const QuestionBlockPropertyPanel = ({
     selectedBlock,
