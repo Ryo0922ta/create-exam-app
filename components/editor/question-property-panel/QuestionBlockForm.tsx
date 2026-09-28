@@ -1,0 +1,1401 @@
+"use client";
+
+import { useState, useEffect, useRef, useCallback } from "react";
+import type { QuestionBlockConfig, QuestionPattern, SubQuestionCell, SubQuestionGroup, SubQuestionLabelType, SubQuestionPattern } from "@/types/editor";
+import { getDefaultCircleCommaPaddingRatio, type CustomQuestionBlockGroup } from "@/lib/editor/questionBlockBuilder";
+import { SECTION_STANDARD_WIDTH, QUESTION_BLOCK_WIDTH_LIMITS, clampQuestionBlockWidth, PAPER_SIZES, B4_LANDSCAPE_MM } from "@/lib/editor/paperSizes";
+import { createSubQuestionLabels, SUB_QUESTION_LABEL_OPTIONS } from "@/lib/editor/subQuestionLabels";
+import type { QuestionBlockFormProps } from "./types";
+
+const EssaySettings = ({
+    group,
+    onChange,
+}: {
+    group: SubQuestionGroup;
+    onChange: (updates: Partial<SubQuestionGroup>) => void;
+}) => {
+    const rows = Math.max(1, Number(group.essayRows) || 1);
+    const cols = Math.max(1, Number(group.essayCols) || 1);
+    const maxCells = rows * cols;
+    const cellCount = Math.min(
+        maxCells,
+        Math.max(1, Number(group.essayCellCount) || maxCells),
+    );
+
+    return (
+        <div className="space-y-1.5 text-[10px] text-slate-600">
+            <label className="flex items-center gap-1">
+                表示方式
+                <select
+                    aria-label="記述欄表示方式"
+                    value={group.essayLayout ?? "line"}
+                    onChange={(e) =>
+                        onChange({
+                            essayLayout: e.target.value as "line" | "grid",
+                        })
+                    }
+                    className="px-1.5 py-0.5 border border-slate-300 rounded bg-white"
+                >
+                    <option value="line">通常記述欄</option>
+                    <option value="grid">マス目方式</option>
+                </select>
+            </label>
+            <div className="grid grid-cols-2 gap-1.5">
+                <label className="flex items-center gap-1">
+                    行数
+                    <input
+                        type="number"
+                        min={1}
+                        max={50}
+                        value={rows}
+                        onChange={(e) =>
+                            onChange({
+                                essayRows: Math.max(
+                                    1,
+                                    Number(e.target.value) || 1,
+                                ),
+                            })
+                        }
+                        className="w-14 px-1 py-0.5 border border-slate-300 rounded text-center"
+                    />
+                </label>
+                {(group.essayLayout ?? "line") === "grid" && (
+                    <>
+                        <label className="flex items-center gap-1">
+                            列数
+                            <input
+                                type="number"
+                                min={1}
+                                max={50}
+                                value={cols}
+                                onChange={(e) => {
+                                    const nextCols = Math.max(
+                                        1,
+                                        Number(e.target.value) || 1,
+                                    );
+                                    onChange({
+                                        essayCols: nextCols,
+                                        essayCellCount: Math.min(
+                                            rows * nextCols,
+                                            cellCount,
+                                        ),
+                                    });
+                                }}
+                                className="w-14 px-1 py-0.5 border border-slate-300 rounded text-center"
+                            />
+                        </label>
+                        <label className="flex items-center gap-1">
+                            マス数
+                            <input
+                                type="number"
+                                min={1}
+                                max={2500}
+                                value={cellCount}
+                                onChange={(e) =>
+                                    onChange({
+                                        essayCellCount: Math.min(
+                                            maxCells,
+                                            Math.max(
+                                                1,
+                                                Number(e.target.value) || 1,
+                                            ),
+                                        ),
+                                    })
+                                }
+                                className="w-14 px-1 py-0.5 border border-slate-300 rounded text-center"
+                            />
+                        </label>
+                        <label className="flex items-center gap-1">
+                            列幅
+                            <input
+                                type="number"
+                                min={1}
+                                max={1000}
+                                placeholder="自動"
+                                value={group.essayColumnWidth ?? ""}
+                                onChange={(e) =>
+                                    onChange({
+                                        essayColumnWidth: e.target.value
+                                            ? Math.max(
+                                                  1,
+                                                  Number(e.target.value) || 1,
+                                              )
+                                            : undefined,
+                                    })
+                                }
+                                className="w-16 px-1 py-0.5 border border-slate-300 rounded text-center"
+                            />
+                            px
+                        </label>
+                    </>
+                )}
+            </div>
+        </div>
+    );
+};
+
+export const QuestionBlockForm = ({
+    block,
+    onUpdate,
+    onClose,
+}: QuestionBlockFormProps) => {
+    const config = block?.questionConfig;
+
+    const [num, setNum] = useState("1");
+    const [rubric, setRubric] = useState("");
+    const [points, setPoints] = useState("");
+    const [pattern, setPattern] = useState<QuestionPattern>("sub_parens");
+
+    // 小問複合枠
+    const [subRows, setSubRows] = useState(2);
+    const [subCols, setSubCols] = useState(3);
+    const [subRowHeight, setSubRowHeight] = useState(34);
+    const [subLabelsText, setSubLabelsText] = useState("");
+
+    // グリッド枠
+    const [gridRows, setGridRows] = useState(2);
+    const [gridCols, setGridCols] = useState(4);
+    const [gridRowHeight, setGridRowHeight] = useState(32);
+
+    // 丸数字
+    const [circleRows, setCircleRows] = useState(1);
+    const [circleCols, setCircleCols] = useState(5);
+    const [circleHeight, setCircleHeight] = useState(32);
+    const [circleCommaEnabled, setCircleCommaEnabled] = useState(false);
+    const [circleCommaPaddingAuto, setCircleCommaPaddingAuto] = useState(true);
+    const [circleCommaPaddingRatio, setCircleCommaPaddingRatio] =
+        useState(0.451);
+
+    // 2分割
+    const [splitRatio, setSplitRatio] = useState("50:50");
+    const [splitHeight, setSplitHeight] = useState(38);
+    const [groups, setGroups] = useState<SubQuestionGroup[]>([
+        {
+            label: "1",
+            height: 42,
+            pattern: "grid",
+            gridRows: 1,
+            gridCols: 1,
+            cells: [{ label: "", widthRatio: 1, type: "box" }],
+        },
+        {
+            label: "2",
+            height: 42,
+            pattern: "sub_parens",
+            subRows: 1,
+            subCols: 3,
+            subLabels: ["(a)", "(b)", "(c)"],
+            cells: [
+                { label: "(a)", widthRatio: 1, type: "box" },
+                { label: "(b)", widthRatio: 1, type: "box" },
+                { label: "(c)", widthRatio: 1, type: "box" },
+            ],
+        },
+        {
+            label: "3",
+            height: 42,
+            pattern: "essay",
+            cells: [{ label: "", widthRatio: 1, type: "essay" }],
+        },
+    ]);
+    const [blockWidth, setBlockWidth] = useState(SECTION_STANDARD_WIDTH);
+    const blockWidthMm = Math.round(
+        (Number(blockWidth) / PAPER_SIZES.B4_LANDSCAPE.widthPx) *
+            B4_LANDSCAPE_MM.width,
+    );
+
+    const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+    const isInitialMountRef = useRef(true);
+
+    // 選択オブジェクトが切り替わったときにフォーム初期化
+    useEffect(() => {
+        if (!config) return;
+
+        setNum(config.num || "1");
+        setRubric(config.rubric || "");
+        setPoints(config.points || "");
+        setPattern(config.pattern || "sub_parens");
+        setBlockWidth(config.blockWidth ?? SECTION_STANDARD_WIDTH);
+
+        setSubRows(config.subRows || 2);
+        setSubCols(config.subCols || 3);
+        setSubRowHeight(config.subRowHeight || 34);
+        setSubLabelsText((config.subLabels || []).join(", "));
+
+        setGridRows(config.gridRows || 2);
+        setGridCols(config.gridCols || 4);
+        setGridRowHeight(config.gridRowHeight || 32);
+
+        setCircleRows(config.circleRows ?? 1);
+        setCircleCols(config.circleCols ?? config.circleCount ?? 5);
+        setCircleHeight(config.circleHeight || 32);
+        setCircleCommaEnabled(config.circleCommaEnabled ?? false);
+        setCircleCommaPaddingAuto(config.circleCommaPaddingAuto ?? true);
+        setCircleCommaPaddingRatio(
+            config.circleCommaPaddingRatio ??
+                getDefaultCircleCommaPaddingRatio(
+                    config.circleCols ?? config.circleCount ?? 5,
+                ),
+        );
+
+        setSplitRatio(config.splitRatio || "50:50");
+        setSplitHeight(config.splitHeight || 38);
+        setGroups(
+            config.groups?.length
+                ? config.groups.map((group, index) => {
+                      const copy = JSON.parse(JSON.stringify(group));
+                      if (copy.pattern) return copy;
+                      const cells = copy.cells?.length
+                          ? copy.cells
+                          : [{ label: "", widthRatio: 1, type: "box" }];
+                      return {
+                          ...copy,
+                          label: copy.label || String(index + 1),
+                          pattern: "sub_parens",
+                          subRows: 1,
+                          subCols: cells.length,
+                          subLabels: cells.map(
+                              (cell: SubQuestionCell) => cell.label,
+                          ),
+                      };
+                  })
+                : [
+                      {
+                          label: "1",
+                          height: 42,
+                          pattern: "grid",
+                          gridRows: 1,
+                          gridCols: 1,
+                          cells: [{ label: "", widthRatio: 1, type: "box" }],
+                      },
+                      {
+                          label: "2",
+                          height: 42,
+                          pattern: "sub_parens",
+                          subRows: 1,
+                          subCols: 3,
+                          subLabels: ["(a)", "(b)", "(c)"],
+                          cells: [
+                              { label: "(a)", widthRatio: 1, type: "box" },
+                              { label: "(b)", widthRatio: 1, type: "box" },
+                              { label: "(c)", widthRatio: 1, type: "box" },
+                          ],
+                      },
+                      {
+                          label: "3",
+                          height: 42,
+                          pattern: "essay",
+                          cells: [{ label: "", widthRatio: 1, type: "essay" }],
+                      },
+                  ],
+        );
+
+        isInitialMountRef.current = true;
+    }, [block]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    const buildConfig = useCallback(
+        (overrides: Partial<QuestionBlockConfig> = {}): QuestionBlockConfig => {
+            const labels =
+                overrides.subLabels !== undefined
+                    ? overrides.subLabels
+                    : subLabelsText
+                          .split(",")
+                          .map((s) => s.trim())
+                          .filter(Boolean);
+
+            const cRows =
+                overrides.circleRows !== undefined
+                    ? overrides.circleRows
+                    : Number(circleRows) || 1;
+            const cCols =
+                overrides.circleCols !== undefined
+                    ? overrides.circleCols
+                    : Number(circleCols) || 1;
+
+            return {
+                num:
+                    (overrides.num !== undefined
+                        ? overrides.num
+                        : num
+                    ).trim() || "1",
+                rubric: (overrides.rubric !== undefined
+                    ? overrides.rubric
+                    : rubric
+                ).trim(),
+                points: (overrides.points !== undefined
+                    ? overrides.points
+                    : points
+                ).trim(),
+                pattern:
+                    overrides.pattern !== undefined
+                        ? overrides.pattern
+                        : pattern,
+                subRows:
+                    overrides.subRows !== undefined
+                        ? overrides.subRows
+                        : Number(subRows) || 1,
+                subCols:
+                    overrides.subCols !== undefined
+                        ? overrides.subCols
+                        : Number(subCols) || 1,
+                subRowHeight:
+                    overrides.subRowHeight !== undefined
+                        ? overrides.subRowHeight
+                        : Number(subRowHeight) || 34,
+                subLabels: labels,
+                gridRows:
+                    overrides.gridRows !== undefined
+                        ? overrides.gridRows
+                        : Number(gridRows) || 1,
+                gridCols:
+                    overrides.gridCols !== undefined
+                        ? overrides.gridCols
+                        : Number(gridCols) || 1,
+                gridRowHeight:
+                    overrides.gridRowHeight !== undefined
+                        ? overrides.gridRowHeight
+                        : Number(gridRowHeight) || 32,
+                circleRows: cRows,
+                circleCols: cCols,
+                circleCount: cRows * cCols,
+                circleHeight:
+                    overrides.circleHeight !== undefined
+                        ? overrides.circleHeight
+                        : Number(circleHeight) || 32,
+                circleCommaEnabled:
+                    overrides.circleCommaEnabled !== undefined
+                        ? overrides.circleCommaEnabled
+                        : circleCommaEnabled,
+                circleCommaCount:
+                    overrides.circleCommaCount !== undefined
+                        ? overrides.circleCommaCount
+                        : 1,
+                circleCommaPaddingAuto:
+                    overrides.circleCommaPaddingAuto !== undefined
+                        ? overrides.circleCommaPaddingAuto
+                        : circleCommaPaddingAuto,
+                circleCommaPaddingRatio:
+                    overrides.circleCommaPaddingRatio !== undefined
+                        ? overrides.circleCommaPaddingRatio
+                        : circleCommaPaddingRatio,
+                splitRatio:
+                    overrides.splitRatio !== undefined
+                        ? overrides.splitRatio
+                        : splitRatio,
+                splitHeight:
+                    overrides.splitHeight !== undefined
+                        ? overrides.splitHeight
+                        : Number(splitHeight) || 38,
+                groups:
+                    overrides.groups !== undefined
+                        ? overrides.groups
+                        : groups.map((group) => ({
+                              label: group.label.trim(),
+                              height: Math.max(24, Number(group.height) || 42),
+                              cells: (group.cells || []).map((cell) => ({
+                                  label: cell.label.trim(),
+                                  widthRatio: Math.max(
+                                      0.01,
+                                      Number(cell.widthRatio) || 1,
+                                  ),
+                                  type: cell.type,
+                              })),
+                              pattern: group.pattern || "sub_parens",
+                              subRows: Math.max(1, Number(group.subRows) || 1),
+                              subCols: Math.max(1, Number(group.subCols) || 1),
+                              subLabels: group.subLabels || [],
+                              subRowConfigs: group.subRowConfigs?.map(
+                                  (row) => ({
+                                      labels: row.labels.map((label) =>
+                                          label.trim(),
+                                      ),
+                                      labelType: row.labelType,
+                                  }),
+                              ),
+                              gridRows: Math.max(
+                                  1,
+                                  Number(group.gridRows) || 1,
+                              ),
+                              gridCols: Math.max(
+                                  1,
+                                  Number(group.gridCols) || 1,
+                              ),
+                              circleRows: Math.max(
+                                  1,
+                                  Number(group.circleRows) || 1,
+                              ),
+                              circleCols: Math.max(
+                                  1,
+                                  Number(group.circleCols) || 1,
+                              ),
+                              circleCommaEnabled:
+                                  group.circleCommaEnabled ?? false,
+                              circleCommaPaddingAuto:
+                                  group.circleCommaPaddingAuto ?? true,
+                              circleCommaPaddingRatio:
+                                  group.circleCommaPaddingRatio ??
+                                  getDefaultCircleCommaPaddingRatio(
+                                      group.circleCols || 1,
+                                  ),
+                              subCommaEnabled: group.subCommaEnabled ?? false,
+                              subCommaCount: Math.max(
+                                  1,
+                                  Number(group.subCommaCount) || 1,
+                              ),
+                              subCommaPaddingAuto:
+                                  group.subCommaPaddingAuto ?? true,
+                              subCommaPaddingRatio:
+                                  group.subCommaPaddingRatio ?? 0.45,
+                              essayLayout: group.essayLayout ?? "line",
+                              essayRows: Math.max(
+                                  1,
+                                  Number(group.essayRows) || 1,
+                              ),
+                              essayCols: Math.max(
+                                  1,
+                                  Number(group.essayCols) || 1,
+                              ),
+                              essayCellCount: Math.min(
+                                  Math.max(
+                                      1,
+                                      Number(group.essayRows) || 1,
+                                  ) *
+                                      Math.max(
+                                          1,
+                                          Number(group.essayCols) || 1,
+                                      ),
+                                  Math.max(
+                                      1,
+                                      Number(group.essayCellCount) ||
+                                          Math.max(
+                                              1,
+                                              Number(group.essayRows) || 1,
+                                          ) *
+                                              Math.max(
+                                                  1,
+                                                  Number(group.essayCols) || 1,
+                                              ),
+                                  ),
+                              ),
+                              essayColumnWidth:
+                                  group.essayColumnWidth &&
+                                  group.essayColumnWidth > 0
+                                      ? group.essayColumnWidth
+                                      : undefined,
+                              splitRatio: group.splitRatio || "50:50",
+                          })),
+                blockWidth: clampQuestionBlockWidth(
+                    overrides.blockWidth !== undefined
+                        ? overrides.blockWidth
+                        : Number(blockWidth) || SECTION_STANDARD_WIDTH,
+                ),
+            };
+        },
+        [
+            num,
+            rubric,
+            points,
+            pattern,
+            subRows,
+            subCols,
+            subRowHeight,
+            subLabelsText,
+            gridRows,
+            gridCols,
+            gridRowHeight,
+            circleRows,
+            circleCols,
+            circleHeight,
+            circleCommaEnabled,
+            circleCommaPaddingAuto,
+            circleCommaPaddingRatio,
+            splitRatio,
+            splitHeight,
+            groups,
+            blockWidth,
+        ],
+    );
+
+    const updateGroup = (
+        groupIndex: number,
+        updates: Partial<SubQuestionGroup>,
+    ) => {
+        const next = groups.map((group, index) =>
+            index === groupIndex ? { ...group, ...updates } : group,
+        );
+        setGroups(next);
+        triggerImmediateUpdate({ groups: next });
+    };
+
+    type EditableSubQuestionRow = {
+        labels: string[];
+        labelType: SubQuestionLabelType;
+    };
+
+    const getSubParensRows = (
+        group: SubQuestionGroup,
+    ): EditableSubQuestionRow[] => {
+        if (group.subRowConfigs?.length) {
+            return group.subRowConfigs.map((row) => ({
+                labels: [...row.labels],
+                labelType: row.labelType || "manual",
+            }));
+        }
+        const rows = Math.max(1, Number(group.subRows) || 1);
+        const cols = Math.max(1, Number(group.subCols) || 1);
+        return Array.from({ length: rows }, (_, rowIndex) => ({
+            labels: Array.from(
+                { length: cols },
+                (_, colIndex) =>
+                    group.subLabels?.[rowIndex * cols + colIndex] || "",
+            ),
+            labelType: "manual",
+        }));
+    };
+
+    const updateSubParensRows = (
+        groupIndex: number,
+        rows: EditableSubQuestionRow[],
+    ) => {
+        updateGroup(groupIndex, {
+            subRowConfigs: rows.map((row) => ({
+                labels: row.labels,
+                labelType: row.labelType,
+            })),
+            subRows: rows.length,
+            subCols: Math.max(1, ...rows.map((row) => row.labels.length)),
+            subLabels: rows.flatMap((row) => row.labels),
+        });
+    };
+
+    const updateSubParensLabelType = (
+        groupIndex: number,
+        rowIndex: number,
+        labelType: SubQuestionLabelType,
+    ) => {
+        const rows = getSubParensRows(groups[groupIndex]);
+        updateSubParensRows(
+            groupIndex,
+            rows.map((row, index) =>
+                index === rowIndex
+                    ? {
+                          ...row,
+                          labelType,
+                          labels:
+                              labelType === "manual"
+                                  ? row.labels
+                                  : createSubQuestionLabels(
+                                        labelType,
+                                        row.labels.length,
+                                    ),
+                      }
+                    : row,
+            ),
+        );
+    };
+
+    const updateSubParensCell = (
+        groupIndex: number,
+        rowIndex: number,
+        colIndex: number,
+        value: string,
+    ) => {
+        const rows = getSubParensRows(groups[groupIndex]);
+        const nextRows = rows.map((row, index) => {
+            if (index !== rowIndex) return row;
+            const labels = [...row.labels];
+            labels[colIndex] = value;
+            return { ...row, labels, labelType: "manual" as const };
+        });
+        updateSubParensRows(groupIndex, nextRows);
+    };
+
+    const addSubParensColumn = (groupIndex: number, rowIndex: number) => {
+        const rows = getSubParensRows(groups[groupIndex]);
+        const nextRows = rows.map((row, index) =>
+            index === rowIndex
+                ? {
+                      ...row,
+                      labels:
+                          row.labelType === "manual"
+                              ? [...row.labels, ""]
+                              : createSubQuestionLabels(
+                                    row.labelType,
+                                    row.labels.length + 1,
+                                ),
+                  }
+                : row,
+        );
+        updateSubParensRows(groupIndex, nextRows);
+    };
+
+    const removeSubParensColumn = (
+        groupIndex: number,
+        rowIndex: number,
+        colIndex: number,
+    ) => {
+        const rows = getSubParensRows(groups[groupIndex]);
+        const nextRows = rows.map((row, index) => {
+            if (index !== rowIndex) return row;
+            if (row.labels.length <= 1) return row;
+            const labels = row.labels.filter(
+                (_, columnIndex) => columnIndex !== colIndex,
+            );
+            return {
+                ...row,
+                labels:
+                    row.labelType === "manual"
+                        ? labels
+                        : createSubQuestionLabels(row.labelType, labels.length),
+            };
+        });
+        updateSubParensRows(groupIndex, nextRows);
+    };
+
+    const addGroup = () => {
+        const next = [
+            ...groups,
+            {
+                label: String(groups.length + 1),
+                height: 42,
+                pattern: "essay" as const,
+            },
+        ];
+        setGroups(next);
+        triggerImmediateUpdate({ groups: next });
+    };
+
+    const removeGroup = (groupIndex: number) => {
+        if (groups.length <= 1) return;
+        const next = groups.filter((_, index) => index !== groupIndex);
+        setGroups(next);
+        triggerImmediateUpdate({ groups: next });
+    };
+
+    // スライダー等の即時更新ハンドラ
+    const triggerImmediateUpdate = useCallback(
+        (overrides: Partial<QuestionBlockConfig> = {}) => {
+            if (debounceTimerRef.current) {
+                clearTimeout(debounceTimerRef.current);
+                debounceTimerRef.current = null;
+            }
+            if (onUpdate) {
+                onUpdate(buildConfig(overrides));
+            }
+        },
+        [buildConfig, onUpdate],
+    );
+
+    const applyBlockWidth = useCallback(
+        (raw: number) => {
+            const clamped = clampQuestionBlockWidth(raw);
+            setBlockWidth(clamped);
+            triggerImmediateUpdate({ blockWidth: clamped });
+        },
+        [triggerImmediateUpdate],
+    );
+
+    // テキスト入力等のデバウンス更新ハンドラ (300ms)
+    const triggerDebouncedUpdate = useCallback(
+        (overrides: Partial<QuestionBlockConfig> = {}) => {
+            if (debounceTimerRef.current) {
+                clearTimeout(debounceTimerRef.current);
+            }
+            debounceTimerRef.current = setTimeout(() => {
+                if (onUpdate) {
+                    onUpdate(buildConfig(overrides));
+                }
+            }, 300);
+        },
+        [buildConfig, onUpdate],
+    );
+
+    // アンマウント時のタイマークリア
+    useEffect(() => {
+        return () => {
+            if (debounceTimerRef.current) {
+                clearTimeout(debounceTimerRef.current);
+            }
+        };
+    }, []);
+
+    return (
+        <div className="flex flex-col h-full">
+            {/* Header */}
+            <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 bg-slate-50">
+                <div className="flex items-center gap-2">
+                    <span className="flex h-6 w-6 items-center justify-center rounded bg-indigo-600 text-white font-bold text-xs">
+                        Q
+                    </span>
+                    <h3 className="font-semibold text-slate-800 text-sm">
+                        大問 {num || ""} のプロパティ
+                    </h3>
+                    <p className="mt-0.5 text-[10px] text-slate-500">
+                        選択中の枠を直接編集
+                    </p>
+                </div>
+                <button
+                    onClick={onClose}
+                    className="text-slate-400 hover:text-slate-600 p-1 rounded hover:bg-slate-200 transition-colors"
+                    title="閉じる"
+                >
+                    <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                    >
+                        <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M6 18L18 6M6 6l12 12"
+                        />
+                    </svg>
+                </button>
+            </div>
+
+            {/* Scrollable Form Body */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                {/* 基本情報 */}
+                <div className="space-y-3">
+                    <div className="grid grid-cols-3 gap-2">
+                        <div>
+                            <label className="block text-slate-700 font-medium mb-1">
+                                大問番号
+                            </label>
+                            <input
+                                type="text"
+                                aria-label="大問番号"
+                                value={num}
+                                onChange={(e) => {
+                                    const val = e.target.value;
+                                    setNum(val);
+                                    triggerDebouncedUpdate({ num: val });
+                                }}
+                                onBlur={() => {
+                                    triggerImmediateUpdate({ num });
+                                }}
+                                placeholder="1"
+                                className="w-full px-2.5 py-1.5 border border-slate-300 rounded focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
+                            />
+                        </div>
+                        <div className="col-span-2">
+                            <label className="block text-slate-700 font-medium mb-1">
+                                配点注記
+                            </label>
+                            <input
+                                type="text"
+                                aria-label="配点注記"
+                                value={points}
+                                onChange={(e) => {
+                                    const val = e.target.value;
+                                    setPoints(val);
+                                    triggerDebouncedUpdate({ points: val });
+                                }}
+                                onBlur={() => {
+                                    triggerImmediateUpdate({ points });
+                                }}
+                                placeholder="例: 各問2点/10点"
+                                className="w-full px-2.5 py-1.5 border border-slate-300 rounded focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
+                            />
+                        </div>
+                    </div>
+
+                    <div>
+                        <label className="block text-slate-700 font-medium mb-1">
+                            指示文・観点名 (rubric)
+                        </label>
+                        <input
+                            type="text"
+                            aria-label="指示文・観点名（rubric）"
+                            value={rubric}
+                            onChange={(e) => {
+                                const val = e.target.value;
+                                setRubric(val);
+                                triggerDebouncedUpdate({ rubric: val });
+                            }}
+                            onBlur={() => {
+                                triggerImmediateUpdate({ rubric });
+                            }}
+                            placeholder="例: 知識・技能 / ○・△・×"
+                            className="w-full px-2.5 py-1.5 border border-slate-300 rounded focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
+                        />
+                    </div>
+
+                    <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-2">
+                        <div className="flex items-center justify-between">
+                            <label className="text-slate-700 font-medium">
+                                大問の横幅
+                            </label>
+                            <div className="flex items-center gap-1">
+                                <input
+                                    type="number"
+                                    aria-label="大問の横幅（px）"
+                                    min={QUESTION_BLOCK_WIDTH_LIMITS.min}
+                                    max={QUESTION_BLOCK_WIDTH_LIMITS.max}
+                                    step={4}
+                                    value={blockWidth}
+                                    onChange={(e) => {
+                                        setBlockWidth(Number(e.target.value));
+                                    }}
+                                    onBlur={() => {
+                                        applyBlockWidth(blockWidth);
+                                    }}
+                                    onKeyDown={(e) => {
+                                        if (e.key === "Enter") {
+                                            applyBlockWidth(blockWidth);
+                                        }
+                                    }}
+                                    className="w-16 px-1.5 py-0.5 border border-slate-300 rounded text-right tabular-nums bg-white focus:ring-1 focus:ring-indigo-500"
+                                />
+                                <span className="text-slate-500 text-[10px]">
+                                    px
+                                </span>
+                                <span className="text-slate-500 text-[10px]">
+                                    （約{blockWidthMm}mm）
+                                </span>
+                            </div>
+                        </div>
+                        <input
+                            type="range"
+                            aria-label="大問の横幅（px）"
+                            min={QUESTION_BLOCK_WIDTH_LIMITS.min}
+                            max={QUESTION_BLOCK_WIDTH_LIMITS.max}
+                            step={4}
+                            value={blockWidth}
+                            onChange={(e) => {
+                                applyBlockWidth(Number(e.target.value));
+                            }}
+                            className="w-full accent-indigo-600"
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-slate-700 font-medium mb-1">
+                            解答欄パターン
+                        </label>
+                        <select
+                            aria-label="解答欄パターン"
+                            value={pattern}
+                            onChange={(e) => {
+                                const newPattern = e.target
+                                    .value as QuestionPattern;
+                                setPattern(newPattern);
+                                triggerImmediateUpdate({ pattern: newPattern });
+                            }}
+                            className="w-full px-2.5 py-1.5 border border-slate-300 rounded focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 bg-white font-medium text-slate-700"
+                        >
+                            <option value="sub_parens">
+                                小問複合枠（(1)(2)...）
+                            </option>
+                            <option value="grouped">
+                                小問グループ（行ごとに設定）
+                            </option>
+                        </select>
+                    </div>
+                </div>
+
+                <hr className="border-slate-200" />
+
+                {/* パターン別設定 */}
+                {pattern === "sub_parens" && (
+                    <div className="space-y-3 bg-slate-50 p-3 rounded-lg border border-slate-200">
+                        <div className="font-semibold text-slate-700 text-[11px] pb-1 border-b border-slate-200">
+                            小問複合枠の設定
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2">
+                            <div>
+                                <label className="block text-slate-600 font-medium mb-1">
+                                    行数
+                                </label>
+                                <input
+                                    type="number"
+                                    min={1}
+                                    max={10}
+                                    value={subRows}
+                                    onChange={(e) => {
+                                        const v = Math.max(
+                                            1,
+                                            Number(e.target.value) || 1,
+                                        );
+                                        setSubRows(v);
+                                        triggerImmediateUpdate({ subRows: v });
+                                    }}
+                                    className="w-full px-2 py-1 border border-slate-300 rounded bg-white"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-slate-600 font-medium mb-1">
+                                    列数
+                                </label>
+                                <input
+                                    type="number"
+                                    min={1}
+                                    max={8}
+                                    value={subCols}
+                                    onChange={(e) => {
+                                        const v = Math.max(
+                                            1,
+                                            Number(e.target.value) || 1,
+                                        );
+                                        setSubCols(v);
+                                        triggerImmediateUpdate({ subCols: v });
+                                    }}
+                                    className="w-full px-2 py-1 border border-slate-300 rounded bg-white"
+                                />
+                            </div>
+                        </div>
+
+                        <div>
+                            <div className="flex items-center justify-between mb-1">
+                                <label className="text-slate-600 font-medium">
+                                    行の高さ
+                                </label>
+                                <span className="text-slate-700 font-semibold tabular-nums">
+                                    {subRowHeight}px
+                                </span>
+                            </div>
+                            <input
+                                type="range"
+                                min={24}
+                                max={100}
+                                step={2}
+                                value={subRowHeight}
+                                onChange={(e) => {
+                                    const v = Number(e.target.value);
+                                    setSubRowHeight(v);
+                                    triggerImmediateUpdate({ subRowHeight: v });
+                                }}
+                                className="w-full accent-indigo-600"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="block text-slate-600 font-medium mb-1">
+                                カスタム小問ラベル (カンマ区切り)
+                            </label>
+                            <input
+                                type="text"
+                                value={subLabelsText}
+                                onChange={(e) => {
+                                    const val = e.target.value;
+                                    setSubLabelsText(val);
+                                    const labels = val
+                                        .split(",")
+                                        .map((s) => s.trim())
+                                        .filter(Boolean);
+                                    triggerDebouncedUpdate({
+                                        subLabels: labels,
+                                    });
+                                }}
+                                onBlur={() => {
+                                    const labels = subLabelsText
+                                        .split(",")
+                                        .map((s) => s.trim())
+                                        .filter(Boolean);
+                                    triggerImmediateUpdate({
+                                        subLabels: labels,
+                                    });
+                                }}
+                                placeholder="例: (1), (2), (3) または ア, イ, ウ"
+                                className="w-full px-2 py-1 border border-slate-300 rounded bg-white"
+                            />
+                            <p className="text-[10px] text-slate-400 mt-0.5">
+                                空欄の場合は (1), (2)... が自動で振られます
+                            </p>
+                        </div>
+                    </div>
+                )}
+
+                {pattern === "grouped" && (
+                    <div className="space-y-3 bg-slate-50 p-3 rounded-lg border border-slate-200">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <div className="font-semibold text-slate-700 text-[11px]">
+                                    小問グループの設定
+                                </div>
+                                <p className="text-[10px] text-slate-400 mt-0.5">
+                                    行ごとに解答欄を編集
+                                </p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={addGroup}
+                                className="px-2 py-1 text-[10px] text-indigo-700 border border-indigo-200 rounded bg-white hover:bg-indigo-50"
+                            >
+                                ＋小問
+                            </button>
+                        </div>
+                        {groups.map((group, groupIndex) => (
+                            <div
+                                key={`property-group-${groupIndex}`}
+                                className="rounded border border-slate-200 bg-white p-2 space-y-2"
+                            >
+                                <div className="flex items-center gap-1.5">
+                                    <input
+                                        type="text"
+                                        aria-label={`小問${groupIndex + 1}番号`}
+                                        value={group.label}
+                                        onChange={(e) =>
+                                            updateGroup(groupIndex, {
+                                                label: e.target.value,
+                                            })
+                                        }
+                                        className="w-12 px-1.5 py-1 border border-slate-300 rounded text-center"
+                                    />
+                                    <input
+                                        type="number"
+                                        aria-label={`小問${groupIndex + 1}高さ`}
+                                        min={24}
+                                        max={240}
+                                        value={group.height}
+                                        onChange={(e) =>
+                                            updateGroup(groupIndex, {
+                                                height:
+                                                    Number(e.target.value) ||
+                                                    24,
+                                            })
+                                        }
+                                        className="w-14 px-1.5 py-1 border border-slate-300 rounded text-center"
+                                    />
+                                    <span className="text-[10px] text-slate-500">
+                                        px
+                                    </span>
+                                    <button
+                                        type="button"
+                                        onClick={() => removeGroup(groupIndex)}
+                                        disabled={groups.length <= 1}
+                                        className="ml-auto text-[10px] text-red-600 disabled:opacity-40"
+                                    >
+                                        削除
+                                    </button>
+                                </div>
+                                <select
+                                    aria-label={`小問${groupIndex + 1}パターン`}
+                                    value={group.pattern || "sub_parens"}
+                                    onChange={(e) =>
+                                        updateGroup(groupIndex, {
+                                            pattern: e.target
+                                                .value as SubQuestionPattern,
+                                        })
+                                    }
+                                    className="w-full px-2 py-1 border border-slate-300 rounded bg-white"
+                                >
+                                    <option value="sub_parens">
+                                        小問複合枠
+                                    </option>
+                                    <option value="essay">記述欄</option>
+                                </select>
+
+                                {group.pattern === "essay" && (
+                                    <EssaySettings
+                                        group={group}
+                                        onChange={(updates) =>
+                                            updateGroup(groupIndex, updates)
+                                        }
+                                    />
+                                )}
+
+                                {group.pattern === "sub_parens" && (
+                                    <div className="space-y-1.5">
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-[10px] text-slate-500">
+                                                行ごとのラベル・列数
+                                            </span>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    const rows =
+                                                        getSubParensRows(group);
+                                                    updateSubParensRows(
+                                                        groupIndex,
+                                                        [
+                                                            ...rows,
+                                                            {
+                                                                labels: [""],
+                                                                labelType:
+                                                                    "manual",
+                                                            },
+                                                        ],
+                                                    );
+                                                }}
+                                                className="px-1.5 py-0.5 text-[10px] text-indigo-700 border border-indigo-200 rounded"
+                                            >
+                                                ＋行
+                                            </button>
+                                        </div>
+                                        {getSubParensRows(group).map(
+                                            (row, rowIndex, rows) => (
+                                                <div
+                                                    key={`property-sub-row-${groupIndex}-${rowIndex}`}
+                                                    className="rounded border border-slate-200 bg-slate-50 p-2 space-y-1.5"
+                                                >
+                                                    <div className="flex items-center justify-between">
+                                                        <span className="text-[10px] font-semibold text-slate-500">
+                                                            {rowIndex + 1}行
+                                                        </span>
+                                                        <div className="flex items-center gap-1">
+                                                            <select
+                                                                aria-label={`小問${groupIndex + 1} ${rowIndex + 1}行目のラベル形式`}
+                                                                value={
+                                                                    row.labelType
+                                                                }
+                                                                onChange={(e) =>
+                                                                    updateSubParensLabelType(
+                                                                        groupIndex,
+                                                                        rowIndex,
+                                                                        e.target
+                                                                            .value as SubQuestionLabelType,
+                                                                    )
+                                                                }
+                                                                className="px-1.5 py-0.5 text-[10px] border border-slate-300 rounded bg-white"
+                                                            >
+                                                                {SUB_QUESTION_LABEL_OPTIONS.map(
+                                                                    (
+                                                                        option,
+                                                                    ) => (
+                                                                        <option
+                                                                            key={
+                                                                                option.value
+                                                                            }
+                                                                            value={
+                                                                                option.value
+                                                                            }
+                                                                        >
+                                                                            {
+                                                                                option.label
+                                                                            }
+                                                                        </option>
+                                                                    ),
+                                                                )}
+                                                            </select>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() =>
+                                                                    addSubParensColumn(
+                                                                        groupIndex,
+                                                                        rowIndex,
+                                                                    )
+                                                                }
+                                                                className="px-1.5 py-0.5 text-[10px] text-indigo-700 border border-indigo-200 rounded bg-white"
+                                                            >
+                                                                ＋列
+                                                            </button>
+                                                            {rows.length >
+                                                                1 && (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() =>
+                                                                        updateSubParensRows(
+                                                                            groupIndex,
+                                                                            rows.filter(
+                                                                                (
+                                                                                    _,
+                                                                                    index,
+                                                                                ) =>
+                                                                                    index !==
+                                                                                    rowIndex,
+                                                                            ),
+                                                                        )
+                                                                    }
+                                                                    className="px-1.5 py-0.5 text-[10px] text-red-600 border border-red-200 rounded bg-white"
+                                                                >
+                                                                    行削除
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex flex-wrap items-center gap-1.5">
+                                                        {row.labels.map(
+                                                            (
+                                                                label,
+                                                                colIndex,
+                                                            ) => (
+                                                                <div
+                                                                    key={`property-sub-col-${groupIndex}-${rowIndex}-${colIndex}`}
+                                                                    className="flex items-center gap-0.5"
+                                                                >
+                                                                    <input
+                                                                        type="text"
+                                                                        aria-label={`小問${groupIndex + 1} ${rowIndex + 1}行 ${colIndex + 1}列のラベル`}
+                                                                        value={
+                                                                            label
+                                                                        }
+                                                                        onChange={(
+                                                                            e,
+                                                                        ) =>
+                                                                            updateSubParensCell(
+                                                                                groupIndex,
+                                                                                rowIndex,
+                                                                                colIndex,
+                                                                                e
+                                                                                    .target
+                                                                                    .value,
+                                                                            )
+                                                                        }
+                                                                        className="w-16 px-1.5 py-1 border border-slate-300 rounded text-center font-mono bg-white"
+                                                                        placeholder="(a)"
+                                                                    />
+                                                                    {row.labels
+                                                                        .length >
+                                                                        1 && (
+                                                                        <button
+                                                                            type="button"
+                                                                            aria-label={`${rowIndex + 1}行 ${colIndex + 1}列を削除`}
+                                                                            onClick={() =>
+                                                                                removeSubParensColumn(
+                                                                                    groupIndex,
+                                                                                    rowIndex,
+                                                                                    colIndex,
+                                                                                )
+                                                                            }
+                                                                            className="px-1 py-0.5 text-[10px] text-red-600 hover:bg-red-50 rounded"
+                                                                        >
+                                                                            ×
+                                                                        </button>
+                                                                    )}
+                                                                </div>
+                                                            ),
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            ),
+                                        )}
+                                    </div>
+                                )}
+
+                                {group.pattern === "sub_parens" && (
+                                    <div className="space-y-1 text-[10px] text-slate-600">
+                                        <label className="flex items-center gap-1">
+                                            <input
+                                                type="checkbox"
+                                                checked={
+                                                    group.subCommaEnabled ??
+                                                    false
+                                                }
+                                                onChange={(e) =>
+                                                    updateGroup(groupIndex, {
+                                                        subCommaEnabled:
+                                                            e.target.checked,
+                                                    })
+                                                }
+                                            />
+                                            「,」で区切る
+                                        </label>
+                                        <label className="flex items-center gap-1">
+                                            カンマ数
+                                            <input
+                                                type="number"
+                                                min={1}
+                                                max={20}
+                                                value={Math.max(
+                                                    1,
+                                                    Number(
+                                                        group.subCommaCount,
+                                                    ) || 1,
+                                                )}
+                                                disabled={
+                                                    !group.subCommaEnabled
+                                                }
+                                                onChange={(e) =>
+                                                    updateGroup(groupIndex, {
+                                                        subCommaCount:
+                                                            Math.min(
+                                                                20,
+                                                                Math.max(
+                                                                    1,
+                                                                    Number(
+                                                                        e.target
+                                                                            .value,
+                                                                    ) || 1,
+                                                                ),
+                                                            ),
+                                                    })
+                                                }
+                                                className="w-14 px-1 py-0.5 border border-slate-300 rounded text-center disabled:bg-slate-100"
+                                            />
+                                        </label>
+                                        <label className="flex items-center gap-1">
+                                            <input
+                                                type="checkbox"
+                                                checked={
+                                                    group.subCommaPaddingAuto ??
+                                                    true
+                                                }
+                                                disabled={
+                                                    !group.subCommaEnabled
+                                                }
+                                                onChange={(e) =>
+                                                    updateGroup(groupIndex, {
+                                                        subCommaPaddingAuto:
+                                                            e.target.checked,
+                                                    })
+                                                }
+                                            />
+                                            位置を自動調整
+                                        </label>
+                                        {Math.max(
+                                            1,
+                                            Number(group.subCommaCount) || 1,
+                                        ) === 1 ? (
+                                            <label className="flex items-center gap-1">
+                                                カンマ位置（%）
+                                                <input
+                                                    type="number"
+                                                    min={5}
+                                                    max={95}
+                                                    value={Math.round(
+                                                        ((group.subCommaPaddingAuto ??
+                                                        true)
+                                                            ? 0.45
+                                                            : (group.subCommaPaddingRatio ??
+                                                              0.45)) * 100,
+                                                    )}
+                                                    disabled={
+                                                        !group.subCommaEnabled ||
+                                                        (group.subCommaPaddingAuto ??
+                                                            true)
+                                                    }
+                                                    onChange={(e) =>
+                                                        updateGroup(
+                                                            groupIndex,
+                                                            {
+                                                                subCommaPaddingAuto:
+                                                                    false,
+                                                                subCommaPaddingRatio:
+                                                                    Math.min(
+                                                                        0.95,
+                                                                        Math.max(
+                                                                            0.05,
+                                                                            (Number(
+                                                                                e
+                                                                                    .target
+                                                                                    .value,
+                                                                            ) ||
+                                                                                5) /
+                                                                                100,
+                                                                        ),
+                                                                    ),
+                                                            },
+                                                        )
+                                                    }
+                                                    className="w-14 px-1 py-0.5 border border-slate-300 rounded text-center disabled:bg-slate-100"
+                                                />
+                                            </label>
+                                        ) : (
+                                            <span className="text-slate-500">
+                                                カンマはセル全体に等間隔で配置
+                                            </span>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
