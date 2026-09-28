@@ -2,9 +2,9 @@
 
 import { useState, useRef, ChangeEvent, DragEvent } from "react";
 import Link from "next/link";
-import { CsvUploader } from "@/components/CsvUploader";
-import { LayoutSettingsModal } from "@/components/LayoutSettingsModal";
-import { PreviewPanel } from "@/components/PreviewPanel";
+import { CsvUploader } from "@/components/csveditor/CsvUploader";
+import { LayoutSettingsModal } from "@/components/csveditor/LayoutSettingsModal";
+import { PreviewPanel } from "@/components/csveditor/PreviewPanel";
 import {
     createExamPreview,
     createLayoutSettings,
