@@ -175,9 +175,9 @@ B4横（364×257mm）サイズの Fabric.js キャンバス上で、大問ブロ
 
 | パス | 責務 |
 | ---- | ---- |
-| `components/editor/AnswerSheetCanvasEditor.tsx` | Fabric 初期化、イベント、エクスポート、モーダル・サイドパネル統括 |
-| `components/editor/EditorToolbar.tsx` | ツールバー UI（方眼・吸着・配置ガイド・余白ガイド・ズーム） |
-| `components/editor/QuestionBlockPropertyPanel.tsx` | 選択ブロックのプロパティ編集サイドパネル |
+| `components/editor/AnswerSheetCanvasEditor/AnswerSheetCanvasEditor.tsx` | Fabric 初期化、イベント、エクスポート、モーダル・サイドパネル統括 |
+| `components/editor/toolbar/EditorToolbar.tsx` | ツールバー UI（方眼・吸着・配置ガイド・余白ガイド・ズーム） |
+| `components/editor/question-property-panel/QuestionBlockPropertyPanel.tsx` | 選択ブロックのプロパティ編集サイドパネル |
 | `components/editor/modals/QuestionEditModal.tsx` | 大問の新規作成（リアルタイムプレビュー付き） |
 | `components/editor/modals/ImportTextModal.tsx` | 問題文から小問記号を自動抽出 |
 | `components/editor/modals/BatchReplaceModal.tsx` | 観点記号の一括置換 |

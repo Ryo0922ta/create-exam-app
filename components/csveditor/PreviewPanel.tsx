@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { AnswerSheetPreview } from "@/components/AnswerSheetPreview";
-import { QuestionPaperPreview } from "@/components/QuestionPaperPreview";
+import { AnswerSheetPreview } from "@/components/csveditor/AnswerSheetPreview";
+import { QuestionPaperPreview } from "@/components/csveditor/QuestionPaperPreview";
 import { PdfDownloadTarget } from "@/lib/generateExamPdf";
 import { ExamPreview } from "@/types/exam";
 import { LayoutSettings } from "@/types/layout";

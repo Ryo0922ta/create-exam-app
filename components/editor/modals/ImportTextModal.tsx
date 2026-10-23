@@ -14,7 +14,7 @@ import {
 } from "@/lib/editor/symbolParser";
 import { drawModalPreviewCanvas } from "@/lib/editor/questionBlockBuilder";
 import { SECTION_STANDARD_WIDTH } from "@/lib/editor/paperSizes";
-import { GroupedQuestionEditor } from "@/components/editor/GroupedQuestionEditor";
+import { GroupedQuestionEditor } from "@/components/editor/grouped-question/GroupedQuestionEditor";
 
 interface ImportTextModalProps {
     isOpen: boolean;
@@ -224,9 +224,8 @@ export const ImportTextModal: React.FC<ImportTextModalProps> = ({
 
                     {groups.length > 0 && (
                         <GroupedQuestionEditor
-                            groups={groups}
-                            onChange={setGroups}
-                            title="解析された小問グループ"
+                            data={{ groups, onChange: setGroups }}
+                            options={{ title: "解析された小問グループ" }}
                         />
                     )}
 

@@ -39,7 +39,7 @@ export async function generateExamPdf({
     const [{ pdf }, { QuestionSheetDocument, AnswerSheetDocument }] =
         await Promise.all([
             import("@react-pdf/renderer"),
-            import("@/components/pdfDocuments"),
+            import("@/components/csveditor/pdfDocuments"),
         ]);
 
     const baseName = fileName?.replace(/\.csv$/i, "") || "試験";
